@@ -1,4 +1,5 @@
-<img width="985" height="904" alt="image" src="https://github.com/user-attachments/assets/611882ed-6bfb-4c52-bdf9-0a9565e873de" />
+<img width="1030" height="897" alt="image" src="https://github.com/user-attachments/assets/903a2e8b-642f-463d-b71c-b181c7e11a5e" />
+
 
 
 # PD2 SP Armory
