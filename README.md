@@ -2,54 +2,23 @@
 
 Web-based character viewer for Project Diablo 2 singleplayer. Drop your `.d2s` save files in and browse your characters — equipment, inventory, stats, and skills — with Diablo II-styled item tooltips and wiki item images.
 
+PD2 data files and wiki images are included — just clone, install, and run.
+
 ![PD2 Armory Screenshot](https://github.com/user-attachments/assets/placeholder.png)
 
-## Windows Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
-- [Project Diablo 2](https://www.projectdiablo2.com/) installed
 
-### Setup
+### Install & Run
 
 ```bash
-git clone https://github.com/houd1ni/pd2-sp-armory.git
+git clone https://github.com/bmberirl/pd2-sp-armory.git
 cd pd2-sp-armory
 npm install
 ```
-
-### Copy PD2 Data Files
-
-The armory needs PD2's TXT data files to parse items correctly. Copy them from your PD2 install:
-
-**Source:** `<PD2 Install>/ProjectD2/data/global/excel/`
-
-Copy these files into the `data/` folder:
-
-| File | Purpose |
-|------|---------|
-| `ItemStatCost.txt` | Stat definitions and display |
-| `Armor.txt` | Armor base items |
-| `Weapons.txt` | Weapon base items |
-| `Misc.txt` | Misc items (rings, charms, gems, runes) |
-| `UniqueItems.txt` | Unique item names |
-| `SetItems.txt` | Set item names |
-| `Skills.txt` | Skill names |
-| `Properties.txt` | Item property definitions |
-| `string.txt` | String table |
-
-### Download Wiki Images (Optional)
-
-Download item images from the PD2 wiki for rich tooltips:
-
-```bash
-node download-wiki-images.js
-```
-
-This fetches ~1100 PNG images into `public/img/wiki/`. Only needs to run once — it skips existing files on re-run.
-
-### Run
 
 Point `SAVES_DIR` at your PD2 save folder and start the server:
 
@@ -63,7 +32,7 @@ $env:SAVES_DIR = "C:\Program Files (x86)\Diablo II\Save"
 node server.js
 ```
 
-Or simply copy/symlink your `.d2s` files into the `saves/` folder and run without setting `SAVES_DIR`:
+Or simply copy your `.d2s` files into the `saves/` folder and run:
 
 ```bash
 node server.js
@@ -88,11 +57,12 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-This installs the armory to `/opt/pd2-armory`, sets up a systemd service, and installs npm dependencies. After setup:
+This installs the armory to `/opt/pd2-armory`, sets up a systemd service, and installs npm dependencies. Then start it:
 
-1. Copy PD2 data TXT files to `/opt/pd2-armory/data/`
-2. Start: `sudo systemctl start pd2-armory`
-3. View logs: `journalctl -u pd2-armory -f`
+```bash
+sudo systemctl start pd2-armory
+journalctl -u pd2-armory -f   # view logs
+```
 
 ### Syncing Saves from Windows
 
@@ -103,3 +73,13 @@ Use the included sync scripts to copy `.d2s` files from your Windows PC to the L
 - **`sync-saves.vbs`** — Silent wrapper for `sync-saves.bat` (no console window)
 
 Edit the scripts to set your server IP and save directory before use.
+
+## Updating Wiki Images
+
+To re-download or update wiki images:
+
+```bash
+node download-wiki-images.js
+```
+
+This fetches PNGs from the PD2 wiki into `public/img/wiki/`. It skips existing files, so it's safe to re-run.

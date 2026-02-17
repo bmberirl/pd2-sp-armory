@@ -1,8 +1,6 @@
 node_modules/
 saves/*.d2s
-data/*.txt
 extracted-resources/
-public/img/wiki/
 extract-*.ps1
 search-strings.ps1
 scan-dll-images.ps1
