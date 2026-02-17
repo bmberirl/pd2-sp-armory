@@ -7,8 +7,6 @@ Web-based character viewer for Project Diablo 2 singleplayer. Drop your `.d2s` s
 
 PD2 data files and wiki images are included — just clone, install, and run.
 
-![PD2 Armory Screenshot](https://github.com/user-attachments/assets/placeholder.png)
-
 ## Quick Start
 
 ### Prerequisites
