@@ -1,3 +1,6 @@
+<img width="985" height="904" alt="image" src="https://github.com/user-attachments/assets/611882ed-6bfb-4c52-bdf9-0a9565e873de" />
+
+
 # PD2 SP Armory
 
 Web-based character viewer for Project Diablo 2 singleplayer. Drop your `.d2s` save files in and browse your characters — equipment, inventory, stats, and skills — with Diablo II-styled item tooltips and wiki item images.
