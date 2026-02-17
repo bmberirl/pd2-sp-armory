@@ -1910,20 +1910,32 @@ async function start() {
   await loadAllCharacters();
 
   // Watch for save file changes
-  const watcher = chokidar.watch(path.join(SAVES_DIR, '*.d2s'), {
+  const watcher = chokidar.watch(SAVES_DIR, {
     ignoreInitial: true,
+    usePolling: true,
+    interval: 2000,
     awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 },
+    depth: 0,
   });
 
+  watcher.on('ready', () => {
+    console.log('[OK] File watcher ready');
+  });
+  watcher.on('error', (err) => {
+    console.error('[WATCH] Error:', err.message);
+  });
   watcher.on('add', (fp) => {
+    if (!fp.endsWith('.d2s')) return;
     console.log(`[FILE] New save: ${path.basename(fp)}`);
     loadCharacter(fp);
   });
   watcher.on('change', (fp) => {
+    if (!fp.endsWith('.d2s')) return;
     console.log(`[FILE] Updated save: ${path.basename(fp)}`);
     loadCharacter(fp);
   });
   watcher.on('unlink', (fp) => {
+    if (!fp.endsWith('.d2s')) return;
     const name = path.basename(fp, '.d2s').toLowerCase();
     if (characters.delete(name)) {
       console.log(`[FILE] Removed: ${name}`);
