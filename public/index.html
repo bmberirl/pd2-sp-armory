@@ -9,130 +9,205 @@
 </head>
 <body>
   <div id="app">
-    <!-- Header -->
-    <header id="header">
-      <h1>PD2 Armory</h1>
-      <div id="char-selector">
-        <select id="char-dropdown">
-          <option value="">Select Character</option>
-        </select>
+
+    <!-- Top controls -->
+    <div id="top-bar">
+      <select id="char-dropdown">
+        <option value="">Select Character</option>
+      </select>
+      <div id="view-toggle">
+        <button id="btn-player" class="toggle-btn active">Character</button>
+        <button id="btn-merc" class="toggle-btn">Mercenary</button>
       </div>
-    </header>
+    </div>
 
     <!-- No characters message -->
-    <div id="no-chars" class="panel" style="display:none;">
+    <div id="no-chars" style="display:none;">
       <p>No characters found. Place <code>.d2s</code> save files in the <code>saves/</code> directory.</p>
     </div>
 
     <!-- Character View -->
     <div id="char-view" style="display:none;">
 
-      <!-- Character Info Bar -->
-      <div id="char-info" class="panel">
-        <span id="char-name" class="char-name"></span>
-        <span id="char-class"></span>
-        <span id="char-level"></span>
-        <span id="char-flags"></span>
-      </div>
+      <!-- D2 Main Frame -->
+      <div id="d2-frame">
 
-      <!-- Merc toggle -->
-      <div id="view-toggle" class="panel">
-        <button id="btn-player" class="toggle-btn active">Character</button>
-        <button id="btn-merc" class="toggle-btn">Mercenary</button>
+        <!-- Character Header: Name + Class boxes -->
+        <div id="char-header">
+          <div class="d2-name-box" id="char-name"></div>
+          <div class="d2-name-box" id="char-class-box">
+            <span id="char-class"></span>
+          </div>
+          <span id="char-flags"></span>
+        </div>
+
+        <!-- Two-panel layout -->
+        <div id="main-panels">
+
+          <!-- LEFT: Stats Panel -->
+          <div id="stats-panel">
+
+            <!-- Level / Experience / Next Level row -->
+            <div class="stat-header-row">
+              <div class="d2-box">
+                <span class="d2-label">Level</span>
+                <span id="char-level" class="d2-value">0</span>
+              </div>
+              <div class="d2-box wide">
+                <span class="d2-label">Experience</span>
+                <span id="stat-exp" class="d2-value">0</span>
+              </div>
+              <div class="d2-box">
+                <span class="d2-label">Next Level</span>
+                <span id="stat-next-level" class="d2-value placeholder">--</span>
+              </div>
+            </div>
+
+            <!-- Attributes + Derived Stats (two columns) -->
+            <div class="attr-derived-grid">
+
+              <!-- Strength row -->
+              <div class="attr-box">
+                <span class="d2-label">Strength</span>
+                <span id="stat-str" class="d2-value">0</span>
+              </div>
+              <div class="derived-stack">
+                <div class="d2-derived-box">
+                  <span class="d2-label-sm">Attack Damage</span>
+                  <span class="d2-value placeholder">--</span>
+                </div>
+                <div class="d2-derived-box">
+                  <span class="d2-label-sm">Attack Damage</span>
+                  <span class="d2-value placeholder">--</span>
+                </div>
+              </div>
+
+              <!-- Dexterity row -->
+              <div class="attr-box">
+                <span class="d2-label">Dexterity</span>
+                <span id="stat-dex" class="d2-value">0</span>
+              </div>
+              <div class="derived-stack">
+                <div class="d2-derived-box">
+                  <span class="d2-label-sm">Attack Rating</span>
+                  <span id="stat-attack-rating" class="d2-value">--</span>
+                </div>
+                <div class="d2-derived-box">
+                  <span class="d2-label-sm">Defense</span>
+                  <span id="stat-defense" class="d2-value">--</span>
+                </div>
+              </div>
+
+              <!-- Vitality row -->
+              <div class="attr-box">
+                <span class="d2-label">Vitality</span>
+                <span id="stat-vit" class="d2-value">0</span>
+              </div>
+              <div class="derived-stack">
+                <div class="d2-derived-box">
+                  <span class="d2-label-sm">Stamina</span>
+                  <span id="stat-stamina" class="d2-value">--</span>
+                </div>
+                <div class="d2-derived-box life">
+                  <span class="d2-label-sm">Life</span>
+                  <span id="stat-life" class="d2-value">0</span>
+                </div>
+              </div>
+
+              <!-- Energy row -->
+              <div class="attr-box">
+                <span class="d2-label">Energy</span>
+                <span id="stat-ene" class="d2-value">0</span>
+              </div>
+              <div class="derived-stack">
+                <div class="d2-derived-box mana">
+                  <span class="d2-label-sm">Mana</span>
+                  <span id="stat-mana" class="d2-value">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Resistances -->
+            <div class="resist-group">
+              <div class="d2-resist-box fire">
+                <span class="d2-label-sm">Fire Resistance</span>
+                <span id="stat-fire-res" class="d2-value">--</span>
+              </div>
+              <div class="d2-resist-box cold">
+                <span class="d2-label-sm">Cold Resistance</span>
+                <span id="stat-cold-res" class="d2-value">--</span>
+              </div>
+              <div class="d2-resist-box ltng">
+                <span class="d2-label-sm">Lightning Resistance</span>
+                <span id="stat-ltng-res" class="d2-value">--</span>
+              </div>
+              <div class="d2-resist-box poison">
+                <span class="d2-label-sm">Poison Resistance</span>
+                <span id="stat-pois-res" class="d2-value">--</span>
+              </div>
+            </div>
+
+            <!-- Stat/Skill Points -->
+            <div class="points-row">
+              <div class="d2-box compact">
+                <span class="d2-label-sm">Stat Points</span>
+                <span id="stat-statpts" class="d2-value">0</span>
+              </div>
+              <div class="d2-box compact">
+                <span class="d2-label-sm">Skill Points</span>
+                <span id="stat-skillpts" class="d2-value">0</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Vertical Divider -->
+          <div id="panel-divider"></div>
+
+          <!-- RIGHT: Equipment + Inventory -->
+          <div id="equip-panel">
+            <div id="paperdoll">
+              <div class="inv-equip">
+                <div class="swap-tab stab-l1 active">I</div>
+                <div class="swap-tab stab-l2">II</div>
+                <div class="swap-tab stab-r1 active">I</div>
+                <div class="swap-tab stab-r2">II</div>
+                <div class="doll-slot slot-head" data-slot="head" data-label="Helmet"></div>
+                <div class="doll-slot slot-neck" data-slot="neck" data-label="Amulet"></div>
+                <div class="doll-slot slot-larm" data-slot="rArm" data-label="Weapon"></div>
+                <div class="doll-slot slot-torso" data-slot="torso" data-label="Armor"></div>
+                <div class="doll-slot slot-rarm" data-slot="lArm" data-label="Shield"></div>
+                <div class="doll-slot slot-hands" data-slot="hands" data-label="Gloves"></div>
+                <div class="doll-slot slot-lring" data-slot="lRing" data-label="Ring"></div>
+                <div class="doll-slot slot-belt" data-slot="belt" data-label="Belt"></div>
+                <div class="doll-slot slot-rring" data-slot="rRing" data-label="Ring"></div>
+                <div class="doll-slot slot-feet" data-slot="feet" data-label="Boots"></div>
+              </div>
+              <div class="inv-grid" id="inv-grid"></div>
+            </div>
+
+            <!-- Gold bar at bottom of inventory -->
+            <div id="gold-bar">
+              <span class="gold-icon"></span>
+              <span id="stat-gold" class="d2-value gold">0</span>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       <!-- Parse notice -->
-      <div id="parse-notice" class="panel notice" style="display:none;"></div>
+      <div id="parse-notice" class="notice" style="display:none;"></div>
 
-      <!-- Main content: Equipment + Stats/Skills -->
-      <div id="main-content">
-
-        <!-- Paper Doll (D2 Inventory Style) -->
-        <div id="paperdoll" class="d2-inv">
-          <div class="inv-equip">
-            <div class="swap-tab stab-l1 active">I</div>
-            <div class="swap-tab stab-l2">II</div>
-            <div class="swap-tab stab-r1 active">I</div>
-            <div class="swap-tab stab-r2">II</div>
-            <div class="doll-slot slot-head" data-slot="head" data-label="Helmet"></div>
-            <div class="doll-slot slot-neck" data-slot="neck" data-label="Amulet"></div>
-            <div class="doll-slot slot-larm" data-slot="rArm" data-label="Weapon"></div>
-            <div class="doll-slot slot-torso" data-slot="torso" data-label="Armor"></div>
-            <div class="doll-slot slot-rarm" data-slot="lArm" data-label="Shield"></div>
-            <div class="doll-slot slot-hands" data-slot="hands" data-label="Gloves"></div>
-            <div class="doll-slot slot-lring" data-slot="lRing" data-label="Ring"></div>
-            <div class="doll-slot slot-belt" data-slot="belt" data-label="Belt"></div>
-            <div class="doll-slot slot-rring" data-slot="rRing" data-label="Ring"></div>
-            <div class="doll-slot slot-feet" data-slot="feet" data-label="Boots"></div>
-          </div>
-          <div class="inv-grid" id="inv-grid"></div>
-        </div>
-
-        <!-- Right panels: Stats + Skills -->
-        <div id="right-panels">
-          <!-- Stats Panel -->
-          <div id="stats-panel" class="panel">
-            <h2>Attributes</h2>
-            <div class="stat-grid">
-              <div class="stat-row">
-                <span class="stat-label">Strength</span>
-                <span id="stat-str" class="stat-value">0</span>
-              </div>
-              <div class="stat-row">
-                <span class="stat-label">Dexterity</span>
-                <span id="stat-dex" class="stat-value">0</span>
-              </div>
-              <div class="stat-row">
-                <span class="stat-label">Vitality</span>
-                <span id="stat-vit" class="stat-value">0</span>
-              </div>
-              <div class="stat-row">
-                <span class="stat-label">Energy</span>
-                <span id="stat-ene" class="stat-value">0</span>
-              </div>
-            </div>
-            <div class="stat-separator"></div>
-            <div class="stat-grid">
-              <div class="stat-row life">
-                <span class="stat-label">Life</span>
-                <span id="stat-life" class="stat-value">0</span>
-              </div>
-              <div class="stat-row mana">
-                <span class="stat-label">Mana</span>
-                <span id="stat-mana" class="stat-value">0</span>
-              </div>
-            </div>
-            <div class="stat-separator"></div>
-            <div class="stat-grid">
-              <div class="stat-row">
-                <span class="stat-label">Experience</span>
-                <span id="stat-exp" class="stat-value">0</span>
-              </div>
-              <div class="stat-row gold">
-                <span class="stat-label">Gold</span>
-                <span id="stat-gold" class="stat-value">0</span>
-              </div>
-              <div class="stat-row">
-                <span class="stat-label">Stat Points</span>
-                <span id="stat-statpts" class="stat-value">0</span>
-              </div>
-              <div class="stat-row">
-                <span class="stat-label">Skill Points</span>
-                <span id="stat-skillpts" class="stat-value">0</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Skills Panel -->
-          <div id="skills-panel" class="panel">
-            <h2>Skills</h2>
-            <div id="skills-list"></div>
-            <div id="no-skills" style="display:none;">
-              <p class="muted">No skill points allocated.</p>
-            </div>
-          </div>
+      <!-- Skills Panel (below D2 frame) -->
+      <div id="skills-panel">
+        <h2>Skills</h2>
+        <div id="skills-list"></div>
+        <div id="no-skills" style="display:none;">
+          <p class="muted">No skill points allocated.</p>
         </div>
       </div>
+
     </div>
 
     <!-- Item Tooltip -->

@@ -108,7 +108,7 @@ function renderCharacter() {
   // Info bar
   elCharName.textContent = currentChar.name;
   elCharClass.textContent = currentChar.class;
-  elCharLevel.textContent = `Level ${currentChar.level}`;
+  elCharLevel.textContent = currentChar.level;
 
   // Flags
   elCharFlags.innerHTML = '';
@@ -141,16 +141,52 @@ function addFlag(text, cls) {
 
 function renderStats() {
   const s = currentChar.stats || {};
-  $('#stat-str').textContent = s.strength || 0;
-  $('#stat-dex').textContent = s.dexterity || 0;
-  $('#stat-vit').textContent = s.vitality || 0;
-  $('#stat-ene').textContent = s.energy || 0;
-  $('#stat-life').textContent = s.life || 0;
-  $('#stat-mana').textContent = s.mana || 0;
+  const d = currentChar.derivedStats || {};
+
+  // Show total attributes (base + item bonuses) with green color when boosted
+  setStat('#stat-str', d.totalStr ?? s.strength ?? 0, d.itemStr);
+  setStat('#stat-dex', d.totalDex ?? s.dexterity ?? 0, d.itemDex);
+  setStat('#stat-vit', d.totalVit ?? s.vitality ?? 0, d.itemVit);
+  setStat('#stat-ene', d.totalEne ?? s.energy ?? 0, d.itemEne);
+
+  // Life, Mana, Stamina from derived stats (includes item bonuses)
+  $('#stat-life').textContent = d.totalLife ?? s.life ?? 0;
+  $('#stat-mana').textContent = d.totalMana ?? s.mana ?? 0;
+  $('#stat-stamina').textContent = d.stamina ?? '--';
+
   $('#stat-exp').textContent = (s.experience || 0).toLocaleString();
   $('#stat-gold').textContent = ((s.gold || 0) + (s.goldStash || 0)).toLocaleString();
   $('#stat-statpts').textContent = s.statPoints || 0;
   $('#stat-skillpts').textContent = s.skillPoints || 0;
+
+  // Derived stats
+  $('#stat-defense').textContent = d.defense ?? '--';
+  $('#stat-fire-res').textContent = d.fireRes ?? '--';
+  $('#stat-cold-res').textContent = d.coldRes ?? '--';
+  $('#stat-ltng-res').textContent = d.ltngRes ?? '--';
+  $('#stat-pois-res').textContent = d.poisRes ?? '--';
+
+  const elAR = $('#stat-attack-rating');
+  if (elAR) elAR.textContent = d.attackRating ?? '--';
+
+  // Next Level: show total XP threshold (matching in-game display)
+  const elNextLvl = $('#stat-next-level');
+  if (elNextLvl) {
+    elNextLvl.textContent = d.nextLevelExp != null
+      ? d.nextLevelExp.toLocaleString() : '--';
+  }
+}
+
+// Set stat value with green color when boosted by items
+function setStat(selector, value, bonus) {
+  const el = $(selector);
+  if (!el) return;
+  el.textContent = value;
+  if (bonus && bonus > 0) {
+    el.style.color = '#5aff5a';
+  } else {
+    el.style.color = '';
+  }
 }
 
 // ── Render Skills ─────────────────────────────────────────────────────────────

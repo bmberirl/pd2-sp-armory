@@ -11,6 +11,12 @@ const PORT = process.env.PORT || 3001;
 const SAVES_DIR = process.env.SAVES_DIR || path.join(__dirname, 'saves');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 
+// ── Twitch Cloud Push (optional) ────────────────────────────────────────────
+const TWITCH_CHANNEL_ID = process.env.TWITCH_CHANNEL_ID || '';
+const TWITCH_PUSH_SECRET = process.env.TWITCH_PUSH_SECRET || '';
+const TWITCH_EBS_URL = process.env.TWITCH_EBS_URL || '';
+const TWITCH_ENABLED = !!(TWITCH_CHANNEL_ID && TWITCH_PUSH_SECRET && TWITCH_EBS_URL);
+
 // ── State ──────────────────────────────────────────────────────────────────────
 const characters = new Map(); // name -> parsed character data
 let d2sRead = null;
@@ -18,6 +24,9 @@ let d2sConstants = null;
 let uniqueNames = [];  // index -> unique item name (from UniqueItems.txt)
 let setItemNames = []; // index -> set item name (from SetItems.txt)
 let vanillaConstants = null; // kept around for name lookups
+let classStats = {};          // className -> { toHitFactor, lifePerVit, manaPerEne, ... }
+let difficultyPenalties = {}; // 'Normal'|'Nightmare'|'Hell' -> { resistPenalty }
+let experienceTable = [];     // level index -> cumulative XP needed for that level
 
 // ── D2S Library Initialization ─────────────────────────────────────────────────
 const CLASS_NAMES = ['Amazon', 'Sorceress', 'Necromancer', 'Paladin', 'Barbarian', 'Druid', 'Assassin'];
@@ -31,7 +40,7 @@ const BODY_LOCATIONS = {
 const STAT_IDS = {
   0: 'strength', 1: 'energy', 2: 'dexterity', 3: 'vitality',
   4: 'statPoints', 5: 'skillPoints',
-  7: 'life', 9: 'mana',
+  7: 'life', 9: 'mana', 11: 'stamina',
   12: 'level', 13: 'experience', 14: 'gold', 15: 'goldStash'
 };
 
@@ -101,6 +110,69 @@ function parseSkillNames(filePath) {
     }
   }
   return skills;
+}
+
+// Parse CharStats.txt → class-specific constants (ToHitFactor, life/mana per stat, etc.)
+function parseCharStatsFile(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const header = lines[0].split('\t');
+  const col = (name) => header.indexOf(name);
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const cls = cells[col('class')]?.trim();
+    if (!cls || cls === 'Expansion') continue;
+    result[cls] = {
+      toHitFactor: parseInt(cells[col('ToHitFactor')]) || 0,
+      lifePerLevel: (parseInt(cells[col('LifePerLevel')]) || 0) / 4,
+      manaPerLevel: (parseInt(cells[col('ManaPerLevel')]) || 0) / 4,
+      staminaPerLevel: (parseInt(cells[col('StaminaPerLevel')]) || 0) / 4,
+      lifePerVit: (parseInt(cells[col('LifePerVitality')]) || 0) / 4,
+      manaPerEne: (parseInt(cells[col('ManaPerMagic')]) || 0) / 4,
+      staminaPerVit: (parseInt(cells[col('StaminaPerVitality')]) || 0) / 4,
+      baseStr: parseInt(cells[col('str')]) || 0,
+      baseDex: parseInt(cells[col('dex')]) || 0,
+      baseVit: parseInt(cells[col('vit')]) || 0,
+      baseEne: parseInt(cells[col('int')]) || 0,
+      baseLife: parseInt(cells[col('hpadd')]) || 0,
+      baseStamina: parseInt(cells[col('stamina')]) || 0,
+      blockFactor: parseInt(cells[col('BlockFactor')]) || 0,
+    };
+  }
+  return result;
+}
+
+// Parse DifficultyLevels.txt → resist penalty per difficulty
+function parseDifficultyFile(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const header = lines[0].split('\t');
+  const nameCol = header.indexOf('Name');
+  const resCol = header.indexOf('ResistPenalty');
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const name = cells[nameCol]?.trim();
+    if (!name) continue;
+    result[name] = { resistPenalty: parseInt(cells[resCol]) || 0 };
+  }
+  return result;
+}
+
+// Parse Experience.txt → array of cumulative XP per level
+function parseExperienceFile(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const table = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const level = parseInt(cells[0]);
+    if (isNaN(level) || cells[0] === 'MaxLvl') continue;
+    // All classes have the same XP table; use Amazon (column 1)
+    table[level] = parseInt(cells[1]) || 0;
+  }
+  return table;
 }
 
 // ── PD2 Wiki Image URL Helper ─────────────────────────────────────────────
@@ -809,6 +881,101 @@ function getWikiImageUrl(name) {
   return null;
 }
 
+// ── Twitch Cloud Push Helpers ─────────────────────────────────────────────
+
+function filenameToWikitideUrl(filename) {
+  const hash = crypto.createHash('md5').update(filename).digest('hex');
+  return `https://static.wikitide.net/projectdiablo2wiki/${hash[0]}/${hash.slice(0, 2)}/${encodeURIComponent(filename)}`;
+}
+
+function getWikiImageUrlAbsolute(name) {
+  if (!name) return null;
+
+  // 1. Check manual overrides
+  const override = WIKI_IMAGE_OVERRIDES[name];
+  if (override) {
+    if (override.startsWith('/')) return null; // local-only asset (e.g. rejuv gifs)
+    const overrideFn = override.replace(/ /g, '_') + '.png';
+    return filenameToWikitideUrl(overrideFn);
+  }
+
+  // 2. Exact match
+  const exactFn = name.replace(/ /g, '_') + '.png';
+  if (wikiImageSet.has(exactFn)) {
+    return filenameToWikitideUrl(exactFn);
+  }
+
+  // 3. Fuzzy match
+  const norm = name.toLowerCase().replace(/[_ '\-]/g, '');
+  const matched = wikiImageLookup[norm];
+  if (matched) {
+    return filenameToWikitideUrl(matched);
+  }
+
+  return null;
+}
+
+async function pushToCloud() {
+  if (!TWITCH_ENABLED) return;
+
+  try {
+    // Collect all characters, shallow-copy and rewrite image URLs to absolute
+    const payload = [];
+    for (const [, char] of characters) {
+      const copy = { ...char };
+
+      // Rewrite equipped item image URLs
+      if (copy.equipped) {
+        const eq = {};
+        for (const [slot, item] of Object.entries(copy.equipped)) {
+          eq[slot] = { ...item, imageUrl: getWikiImageUrlAbsolute(item.name) || item.imageUrl };
+        }
+        copy.equipped = eq;
+      }
+
+      // Rewrite mercenary item image URLs
+      if (copy.mercenary?.items) {
+        const merc = { ...copy.mercenary, items: {} };
+        for (const [slot, item] of Object.entries(copy.mercenary.items)) {
+          merc.items[slot] = { ...item, imageUrl: getWikiImageUrlAbsolute(item.name) || item.imageUrl };
+        }
+        copy.mercenary = merc;
+      }
+
+      // Rewrite skill image URLs
+      if (copy.skills) {
+        copy.skills = copy.skills.map(sk => ({
+          ...sk,
+          imageUrl: getWikiImageUrlAbsolute(sk.name) || sk.imageUrl,
+        }));
+      }
+
+      // Drop inventory (not shown in panel, saves bandwidth)
+      delete copy.inventory;
+
+      payload.push(copy);
+    }
+
+    const url = `${TWITCH_EBS_URL}/push?channel_id=${encodeURIComponent(TWITCH_CHANNEL_ID)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${TWITCH_PUSH_SECRET}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      console.log(`[TWITCH] Pushed ${payload.length} character(s) to cloud`);
+    } else {
+      console.warn(`[TWITCH] Push failed: HTTP ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[TWITCH] Push error: ${err.message}`);
+  }
+}
+
 // Fallback description strings for PD2-specific stats not in vanilla
 const PD2_STAT_DESCRIPTIONS = {
   'corrupted': { hidden: true }, // Just marks item as corrupted, hide the value
@@ -920,6 +1087,12 @@ async function initD2S() {
     setItemNames = parseTxtNames(path.join(DATA_DIR, 'SetItems.txt'));
     const pd2SkillNames = parseSkillNames(path.join(DATA_DIR, 'Skills.txt'));
     console.log(`[OK] Name lookups: ${uniqueNames.length} unique, ${setItemNames.length} set, ${Object.keys(pd2SkillNames).length} skills`);
+
+    // Parse game data tables for derived stat computation
+    classStats = parseCharStatsFile(path.join(DATA_DIR, 'CharStats.txt'));
+    difficultyPenalties = parseDifficultyFile(path.join(DATA_DIR, 'DifficultyLevels.txt'));
+    experienceTable = parseExperienceFile(path.join(DATA_DIR, 'Experience.txt'));
+    console.log(`[OK] Game data: ${Object.keys(classStats).length} classes, ${experienceTable.length - 1} XP levels, ${Object.keys(difficultyPenalties).length} difficulties`);
 
     // Load PD2 TXT data files
     if (fs.existsSync(DATA_DIR)) {
@@ -1147,6 +1320,177 @@ async function parseCharacter(filePath) {
   return parseBasic(buffer, name);
 }
 
+// ── Derived Stats Computation ───────────────────────────────────────────────
+// Sums specific stat IDs from an item's magic_attributes (including sockets & runewords)
+function sumItemStatId(item, statId) {
+  let total = 0;
+  const sources = [
+    item.magic_attributes,
+    item.runeword_attributes,
+  ];
+  // Include socketed item attributes
+  if (item.socketed_items) {
+    for (const si of item.socketed_items) {
+      if (si.magic_attributes) sources.push(si.magic_attributes);
+    }
+  }
+  // Include active set bonuses
+  if (item.set_attributes) {
+    for (const setAttrs of item.set_attributes) {
+      if (Array.isArray(setAttrs)) sources.push(setAttrs);
+    }
+  }
+  for (const attrs of sources) {
+    if (!Array.isArray(attrs)) continue;
+    for (const attr of attrs) {
+      if (attr && attr.id === statId) {
+        const v = attr.values;
+        total += v[v.length - 1] ?? 0;
+      }
+    }
+  }
+  return total;
+}
+
+// Determine current difficulty from d2s header
+function getCurrentDifficulty(header) {
+  if (header.difficulty) {
+    if (header.difficulty.Hell & 0x80) return 'Hell';
+    if (header.difficulty.Nightmare & 0x80) return 'Nightmare';
+  }
+  return 'Normal';
+}
+
+// Compute derived character stats from raw d2s data
+function computeCharDerivedStats(d2sData) {
+  const header = d2sData.header || d2sData;
+  const attrs = d2sData.attributes || {};
+  const className = typeof header.class === 'string' ? header.class
+    : (CLASS_NAMES[header.class] || 'Amazon');
+  const cs = classStats[className] || {};
+
+  const baseStr = attrs.strength ?? 0;
+  const baseDex = attrs.dexterity ?? 0;
+  const baseVit = attrs.vitality ?? 0;
+  const baseEne = attrs.energy ?? 0;
+  const baseLife = attrs.max_hp ?? 0;
+  const baseMana = attrs.max_mana ?? 0;
+  const level = attrs.level ?? header.level ?? 1;
+
+  // Gather all equipped items (raw, pre-transform)
+  const playerItems = Array.isArray(d2sData.items) ? d2sData.items : [];
+  const equippedItems = playerItems.filter(it => it.location_id === 1 && it.equipped_id > 0 && it.equipped_id <= 12);
+  // Inventory items (charms provide passive bonuses)
+  const inventoryItems = playerItems.filter(it => it.location_id === 0 && it.alt_position_id === 1);
+
+  // All items that contribute stats (equipped + inventory charms)
+  const allStatItems = [...equippedItems, ...inventoryItems];
+
+  // ── Sum item stat bonuses ──
+  let itemStr = 0, itemDex = 0, itemVit = 0, itemEne = 0;
+  let itemLife = 0, itemMana = 0, itemStamina = 0;
+  let flatDefense = 0, flatAR = 0, pctAR = 0;
+  let fireRes = 0, coldRes = 0, ltngRes = 0, poisRes = 0;
+  let pctLife = 0, pctMana = 0, pctStamina = 0;
+  let lifePerLevel = 0, manaPerLevel = 0, arPerLevel = 0, staminaPerLevelItem = 0;
+
+  for (const item of allStatItems) {
+    itemStr += sumItemStatId(item, 0);    // +strength
+    itemEne += sumItemStatId(item, 1);    // +energy
+    itemDex += sumItemStatId(item, 2);    // +dexterity
+    itemVit += sumItemStatId(item, 3);    // +vitality
+    itemLife += sumItemStatId(item, 7);   // +life
+    itemMana += sumItemStatId(item, 9);   // +mana
+    itemStamina += sumItemStatId(item, 11); // +stamina
+    flatDefense += sumItemStatId(item, 31); // flat +defense
+    flatAR += sumItemStatId(item, 19);    // flat +attack rating
+    pctAR += sumItemStatId(item, 119);    // % attack rating
+    fireRes += sumItemStatId(item, 39);   // fire resist
+    ltngRes += sumItemStatId(item, 41);   // lightning resist
+    coldRes += sumItemStatId(item, 43);   // cold resist
+    poisRes += sumItemStatId(item, 45);   // poison resist
+    pctLife += sumItemStatId(item, 76);   // % max life
+    pctMana += sumItemStatId(item, 77);   // % max mana
+    lifePerLevel += sumItemStatId(item, 216);  // life per level (÷8)
+    manaPerLevel += sumItemStatId(item, 217);  // mana per level (÷8)
+    arPerLevel += sumItemStatId(item, 224);    // AR per level (÷2)
+    pctStamina += sumItemStatId(item, 12);     // % max stamina
+    staminaPerLevelItem += sumItemStatId(item, 215); // stamina per level (÷8)
+  }
+
+  // ── Total attributes (base + item bonuses) ──
+  const totalStr = baseStr + itemStr;
+  const totalDex = baseDex + itemDex;
+  const totalVit = baseVit + itemVit;
+  const totalEne = baseEne + itemEne;
+
+  // Life/Mana: base + item flat + vit/ene scaling + per-level + % bonus
+  const lifeFromLevels = Math.floor(lifePerLevel * level / 8);
+  const rawLife = baseLife + itemLife + itemVit * (cs.lifePerVit || 0) + lifeFromLevels;
+  const totalLife = Math.floor(rawLife * (1 + pctLife / 100));
+
+  const manaFromLevels = Math.floor(manaPerLevel * level / 8);
+  const rawMana = baseMana + itemMana + itemEne * (cs.manaPerEne || 0) + manaFromLevels;
+  const totalMana = Math.floor(rawMana * (1 + pctMana / 100));
+
+  // ── Stamina (uses attrs.max_stamina from d2s, same pattern as life/mana) ──
+  const baseStamina = attrs.max_stamina ?? 0;
+  const staminaItemLevels = Math.floor(staminaPerLevelItem * level / 8);
+  const rawStamina = baseStamina + itemStamina + itemVit * (cs.staminaPerVit || 0) + staminaItemLevels;
+  const stamina = Math.floor(rawStamina * (1 + pctStamina / 100));
+
+  // ── Defense (uses total dex) ──
+  let totalDefense = Math.floor(totalDex / 4) + flatDefense;
+  for (const item of equippedItems) {
+    if (d2sConstants?.armor_items?.[item.type]) {
+      const details = d2sConstants.armor_items[item.type];
+      let baseDef = item.defense_rating || details.maxac || 0;
+      if (item.ethereal && !item.defense_rating) baseDef = Math.floor(baseDef * 1.5);
+      // Apply Enhanced Defense % (stat 16) from item's own attributes
+      const edPct = sumItemStatId(item, 16);
+      totalDefense += Math.floor(baseDef * (1 + edPct / 100));
+    }
+  }
+  // Defense per level (stat 214): floor(value * level / 8)
+  let defPerLevel = 0;
+  for (const item of allStatItems) {
+    defPerLevel += sumItemStatId(item, 214);
+  }
+  totalDefense += Math.floor(defPerLevel * level / 8);
+
+  // ── Resistances (with difficulty penalty) ──
+  const difficulty = getCurrentDifficulty(header);
+  const resPenalty = difficultyPenalties[difficulty]?.resistPenalty || 0;
+  fireRes += resPenalty;
+  coldRes += resPenalty;
+  ltngRes += resPenalty;
+  poisRes += resPenalty;
+
+  // ── Attack Rating (uses total dex) ──
+  const arFromLevels = Math.floor(arPerLevel * level / 2);
+  const baseAR = (totalDex - 7) * 5 + (cs.toHitFactor || 0) + flatAR + arFromLevels;
+  const attackRating = Math.max(0, Math.floor(baseAR * (1 + pctAR / 100)));
+
+  // ── Next Level XP ──
+  let nextLevelExp = null;
+  if (level < 99 && experienceTable[level]) {
+    nextLevelExp = experienceTable[level];
+  }
+
+  return {
+    // Total attributes (base + items)
+    totalStr, totalDex, totalVit, totalEne,
+    // Item bonuses (for green color display)
+    itemStr, itemDex, itemVit, itemEne,
+    totalLife, totalMana, stamina,
+    defense: totalDefense,
+    fireRes, coldRes, ltngRes, poisRes,
+    attackRating,
+    difficulty,
+    nextLevelExp,
+  };
+}
+
 function transformD2SData(d2s, filename) {
   const header = d2s.header || d2s;
 
@@ -1233,6 +1577,9 @@ function transformD2SData(d2s, filename) {
     : (CLASS_NAMES[header.class] || `Class ${header.class}`);
   const status = header.status || {};
 
+  // Compute derived stats from raw item data
+  const derivedStats = computeCharDerivedStats(d2s);
+
   return {
     name: header.name || filename,
     class: className,
@@ -1249,6 +1596,7 @@ function transformD2SData(d2s, filename) {
     mercenary: {
       items: mercItems,
     },
+    derivedStats,
     _parseMethod: 'full',
   };
 }
@@ -1878,6 +2226,7 @@ async function loadCharacter(filePath) {
       characters.set(key, char);
       console.log(`[OK] Loaded: ${char.name} (Lv${char.level} ${char.class}) [${char._parseMethod}]`);
       broadcast('character_update', char);
+      pushToCloud();
     }
   } catch (err) {
     console.error(`[ERR] Failed to parse ${filePath}:`, err.message);
@@ -1904,6 +2253,10 @@ async function start() {
   console.log('──────────────────────────────────────────');
   console.log('  PD2 Singleplayer Character Armory');
   console.log('──────────────────────────────────────────');
+
+  if (TWITCH_ENABLED) {
+    console.log(`[TWITCH] Cloud push enabled → ${TWITCH_EBS_URL} (channel ${TWITCH_CHANNEL_ID})`);
+  }
 
   await initD2S();
   await fetchWikiImageList();
