@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD2 Armory</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header id="header">
+      <h1>PD2 Armory</h1>
+      <div id="char-selector">
+        <select id="char-dropdown">
+          <option value="">Select Character</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- No characters message -->
+    <div id="no-chars" class="panel" style="display:none;">
+      <p>No characters found. Place <code>.d2s</code> save files in the <code>saves/</code> directory.</p>
+    </div>
+
+    <!-- Character View -->
+    <div id="char-view" style="display:none;">
+
+      <!-- Character Info Bar -->
+      <div id="char-info" class="panel">
+        <span id="char-name" class="char-name"></span>
+        <span id="char-class"></span>
+        <span id="char-level"></span>
+        <span id="char-flags"></span>
+      </div>
+
+      <!-- Merc toggle -->
+      <div id="view-toggle" class="panel">
+        <button id="btn-player" class="toggle-btn active">Character</button>
+        <button id="btn-merc" class="toggle-btn">Mercenary</button>
+      </div>
+
+      <!-- Parse notice -->
+      <div id="parse-notice" class="panel notice" style="display:none;"></div>
+
+      <!-- Main content: Equipment + Stats/Skills -->
+      <div id="main-content">
+
+        <!-- Paper Doll (D2 Inventory Style) -->
+        <div id="paperdoll" class="d2-inv">
+          <div class="inv-equip">
+            <div class="swap-tab stab-l1 active">I</div>
+            <div class="swap-tab stab-l2">II</div>
+            <div class="swap-tab stab-r1 active">I</div>
+            <div class="swap-tab stab-r2">II</div>
+            <div class="doll-slot slot-head" data-slot="head" data-label="Helmet"></div>
+            <div class="doll-slot slot-neck" data-slot="neck" data-label="Amulet"></div>
+            <div class="doll-slot slot-larm" data-slot="rArm" data-label="Weapon"></div>
+            <div class="doll-slot slot-torso" data-slot="torso" data-label="Armor"></div>
+            <div class="doll-slot slot-rarm" data-slot="lArm" data-label="Shield"></div>
+            <div class="doll-slot slot-hands" data-slot="hands" data-label="Gloves"></div>
+            <div class="doll-slot slot-lring" data-slot="lRing" data-label="Ring"></div>
+            <div class="doll-slot slot-belt" data-slot="belt" data-label="Belt"></div>
+            <div class="doll-slot slot-rring" data-slot="rRing" data-label="Ring"></div>
+            <div class="doll-slot slot-feet" data-slot="feet" data-label="Boots"></div>
+          </div>
+          <div class="inv-grid" id="inv-grid"></div>
+        </div>
+
+        <!-- Right panels: Stats + Skills -->
+        <div id="right-panels">
+          <!-- Stats Panel -->
+          <div id="stats-panel" class="panel">
+            <h2>Attributes</h2>
+            <div class="stat-grid">
+              <div class="stat-row">
+                <span class="stat-label">Strength</span>
+                <span id="stat-str" class="stat-value">0</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Dexterity</span>
+                <span id="stat-dex" class="stat-value">0</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Vitality</span>
+                <span id="stat-vit" class="stat-value">0</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Energy</span>
+                <span id="stat-ene" class="stat-value">0</span>
+              </div>
+            </div>
+            <div class="stat-separator"></div>
+            <div class="stat-grid">
+              <div class="stat-row life">
+                <span class="stat-label">Life</span>
+                <span id="stat-life" class="stat-value">0</span>
+              </div>
+              <div class="stat-row mana">
+                <span class="stat-label">Mana</span>
+                <span id="stat-mana" class="stat-value">0</span>
+              </div>
+            </div>
+            <div class="stat-separator"></div>
+            <div class="stat-grid">
+              <div class="stat-row">
+                <span class="stat-label">Experience</span>
+                <span id="stat-exp" class="stat-value">0</span>
+              </div>
+              <div class="stat-row gold">
+                <span class="stat-label">Gold</span>
+                <span id="stat-gold" class="stat-value">0</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Stat Points</span>
+                <span id="stat-statpts" class="stat-value">0</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Skill Points</span>
+                <span id="stat-skillpts" class="stat-value">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Skills Panel -->
+          <div id="skills-panel" class="panel">
+            <h2>Skills</h2>
+            <div id="skills-list"></div>
+            <div id="no-skills" style="display:none;">
+              <p class="muted">No skill points allocated.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Item Tooltip -->
+    <div id="tooltip" style="display:none;"></div>
+
+    <!-- Connection status -->
+    <div id="ws-status" class="disconnected" title="WebSocket status"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

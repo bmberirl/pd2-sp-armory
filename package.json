@@ -1,0 +1,17 @@
+{
+  "name": "pd2-armory",
+  "version": "1.0.0",
+  "description": "PD2 Singleplayer Character Armory - Web-based character viewer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@dschu012/d2s": "^2.0.36",
+    "chokidar": "^3.6.0",
+    "express": "^4.21.0",
+    "mpyqjs": "^1.0.1",
+    "ws": "^8.18.0"
+  }
+}

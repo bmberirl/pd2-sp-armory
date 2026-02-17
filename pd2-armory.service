@@ -1,0 +1,16 @@
+[Unit]
+Description=PD2 Singleplayer Character Armory
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pd2-armory
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=3001
+
+[Install]
+WantedBy=multi-user.target
