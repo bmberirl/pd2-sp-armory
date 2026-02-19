@@ -1,7 +1,8 @@
 // PD2 Armory Twitch Extension Backend Service (Cloudflare Worker)
 // Endpoints:
-//   POST /push?channel_id=X  — Streamer's server pushes character JSON (per-channel token auth)
-//   GET  /data?channel_id=X  — Extension panel fetches character data (public)
+//   POST /push?channel_id=X    — Streamer's server pushes character JSON (per-channel token auth)
+//   GET  /data?channel_id=X    — Extension panel fetches character data (public)
+//   POST /register             — Broadcaster auto-registers via Twitch JWT → gets per-channel token
 //   GET  /admin/token?channel_id=X — Admin generates a token for a streamer (master secret auth)
 
 const CORS_HEADERS = {
@@ -31,6 +32,10 @@ export default {
       return handleData(env, url);
     }
 
+    if (path === '/register' && request.method === 'POST') {
+      return handleRegister(request, env);
+    }
+
     if (path === '/admin/token' && request.method === 'GET') {
       return handleAdminToken(request, env, url);
     }
@@ -48,6 +53,81 @@ async function generateToken(masterSecret, channelId) {
   );
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(channelId));
   return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Verify a Twitch Extension JWT (HS256 signed with base64-decoded EXT_SECRET)
+async function verifyTwitchJWT(jwtString, extSecret) {
+  const parts = jwtString.split('.');
+  if (parts.length !== 3) throw new Error('Invalid JWT format');
+
+  // Decode base64url
+  function b64urlDecode(str) {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (str.length % 4) str += '=';
+    return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+  }
+
+  const headerPayload = parts[0] + '.' + parts[1];
+  const signature = b64urlDecode(parts[2]);
+  const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(parts[1])));
+
+  // EXT_SECRET from Twitch is base64-encoded
+  const secretBytes = Uint8Array.from(atob(extSecret), c => c.charCodeAt(0));
+
+  const key = await crypto.subtle.importKey(
+    'raw', secretBytes,
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+  );
+
+  const valid = await crypto.subtle.verify(
+    'HMAC', key, signature, new TextEncoder().encode(headerPayload)
+  );
+
+  if (!valid) throw new Error('Invalid JWT signature');
+
+  // Check expiration
+  if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+    throw new Error('JWT expired');
+  }
+
+  return payload;
+}
+
+// Broadcaster self-registration: verify Twitch JWT, return per-channel push token
+async function handleRegister(request, env) {
+  if (!env.EXT_SECRET) {
+    return jsonResponse({ error: 'EXT_SECRET not configured' }, 500);
+  }
+
+  const auth = request.headers.get('Authorization');
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return jsonResponse({ error: 'Missing Twitch JWT' }, 401);
+  }
+
+  let payload;
+  try {
+    payload = await verifyTwitchJWT(auth.slice(7), env.EXT_SECRET);
+  } catch (err) {
+    return jsonResponse({ error: 'Invalid JWT: ' + err.message }, 401);
+  }
+
+  // Only broadcasters can register
+  if (payload.role !== 'broadcaster') {
+    return jsonResponse({ error: 'Only the broadcaster can register' }, 403);
+  }
+
+  const channelId = payload.channel_id;
+  if (!channelId) {
+    return jsonResponse({ error: 'No channel_id in JWT' }, 400);
+  }
+
+  const token = await generateToken(env.PUSH_SECRET, channelId);
+
+  return jsonResponse({
+    channel_id: channelId,
+    token: token,
+    env_config: `TWITCH_CHANNEL_ID=${channelId}\nTWITCH_PUSH_SECRET=${token}\nTWITCH_EBS_URL=https://ebs.bmberirl.com`,
+  });
 }
 
 async function handlePush(request, env, url) {

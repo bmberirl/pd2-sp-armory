@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PD2 Armory - Config</title>
+  <link rel="stylesheet" href="config.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <h1>PD2 Armory Setup</h1>
+
+    <div class="section">
+      <h2>Your Channel ID</h2>
+      <div id="channel-id" class="code-block">Loading...</div>
+    </div>
+
+    <div class="section" id="token-section">
+      <h2>Your Server Configuration</h2>
+      <div id="token-status" class="checking">Generating your credentials...</div>
+      <pre class="code-block" id="env-example" style="display:none"></pre>
+      <p class="hint" id="env-hint" style="display:none">Copy these environment variables into your PD2 Armory server's config, then restart the server.</p>
+    </div>
+
+    <div class="section">
+      <h2>Setup Steps</h2>
+      <ol>
+        <li>Install the <a href="https://github.com/houdejong/pd2-sp-armory" style="color:#88aacc">PD2 SP Armory</a> on your machine</li>
+        <li>Copy the environment variables above into your server config</li>
+        <li>Restart your armory server</li>
+        <li>Play PD2 and Save &amp; Exit — your characters appear in the panel!</li>
+      </ol>
+    </div>
+
+    <div class="section" id="status-section">
+      <h2>Connection Status</h2>
+      <div id="status">Checking...</div>
+    </div>
+  </div>
+
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  <script src="config.js"></script>
+</body>
+</html>

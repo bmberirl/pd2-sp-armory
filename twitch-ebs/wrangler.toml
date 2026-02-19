@@ -1,0 +1,7 @@
+name = "pd2-armory-ebs"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "ARMORY"
+id = "219b5d2bcecb45aebbc87e571f676727"

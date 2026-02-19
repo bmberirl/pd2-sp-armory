@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PD2 Armory</title>
+  <link rel="stylesheet" href="panel.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+
+    <!-- Loading / No Data -->
+    <div id="loading">Loading...</div>
+    <div id="no-data" style="display:none;">
+      <p>No character data available.</p>
+      <p class="muted">The streamer needs to configure the PD2 Armory extension.</p>
+    </div>
+
+    <!-- Character View -->
+    <div id="char-view" style="display:none;">
+
+      <!-- Character Dropdown (if multiple) -->
+      <select id="char-dropdown" style="display:none;">
+        <option value="">Select Character</option>
+      </select>
+
+      <!-- Character Info -->
+      <div id="char-info">
+        <span id="char-name" class="char-name"></span>
+        <span id="char-class"></span>
+        <span id="char-level"></span>
+        <span id="char-flags"></span>
+      </div>
+
+      <!-- Player / Merc Toggle -->
+      <div id="view-toggle">
+        <button id="btn-player" class="toggle-btn active">Character</button>
+        <button id="btn-merc" class="toggle-btn">Mercenary</button>
+      </div>
+
+      <!-- Equipment Paperdoll -->
+      <div id="paperdoll" class="d2-inv">
+        <div class="inv-equip">
+          <div class="swap-tab stab-l1 active">I</div>
+          <div class="swap-tab stab-l2">II</div>
+          <div class="swap-tab stab-r1 active">I</div>
+          <div class="swap-tab stab-r2">II</div>
+          <div class="doll-slot slot-head" data-slot="head" data-label="Helmet"></div>
+          <div class="doll-slot slot-neck" data-slot="neck" data-label="Amulet"></div>
+          <div class="doll-slot slot-larm" data-slot="rArm" data-label="Weapon"></div>
+          <div class="doll-slot slot-torso" data-slot="torso" data-label="Armor"></div>
+          <div class="doll-slot slot-rarm" data-slot="lArm" data-label="Shield"></div>
+          <div class="doll-slot slot-hands" data-slot="hands" data-label="Gloves"></div>
+          <div class="doll-slot slot-lring" data-slot="lRing" data-label="Ring"></div>
+          <div class="doll-slot slot-belt" data-slot="belt" data-label="Belt"></div>
+          <div class="doll-slot slot-rring" data-slot="rRing" data-label="Ring"></div>
+          <div class="doll-slot slot-feet" data-slot="feet" data-label="Boots"></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div id="stats-panel" class="panel">
+        <h2>Attributes</h2>
+        <div class="stat-grid">
+          <div class="stat-row">
+            <span class="stat-label">Str</span>
+            <span id="stat-str" class="stat-value">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Dex</span>
+            <span id="stat-dex" class="stat-value">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Vit</span>
+            <span id="stat-vit" class="stat-value">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Ene</span>
+            <span id="stat-ene" class="stat-value">0</span>
+          </div>
+        </div>
+        <div class="stat-separator"></div>
+        <div class="stat-grid">
+          <div class="stat-row life">
+            <span class="stat-label">Life</span>
+            <span id="stat-life" class="stat-value">0</span>
+          </div>
+          <div class="stat-row mana">
+            <span class="stat-label">Mana</span>
+            <span id="stat-mana" class="stat-value">0</span>
+          </div>
+        </div>
+        <div class="stat-separator"></div>
+        <div class="stat-grid">
+          <div class="stat-row gold">
+            <span class="stat-label">Gold</span>
+            <span id="stat-gold" class="stat-value">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skills -->
+      <div id="skills-panel" class="panel">
+        <h2>Skills</h2>
+        <div id="skills-list"></div>
+        <div id="no-skills" style="display:none;">
+          <p class="muted">No skill points allocated.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Item Tooltip -->
+    <div id="tooltip" style="display:none;"></div>
+  </div>
+
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>
