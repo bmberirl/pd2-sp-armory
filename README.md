@@ -97,33 +97,29 @@ Follow the [Quick Start](#quick-start) above to get the server running locally.
 
 Go to your Twitch channel and install the **PD2 Armory Singleplayer** extension from the Extensions menu. Add it as a **Panel** under your stream.
 
-#### 3. Get your credentials
+#### 3. Connect to Twitch
 
-Open the extension's **Configure** page (gear icon on the extension in your Twitch dashboard). Your unique credentials will be generated automatically:
+Open **http://localhost:3001/setup** in your browser and click **Connect to Twitch**. This will:
 
-```
-TWITCH_CHANNEL_ID=your_channel_id
-TWITCH_PUSH_SECRET=your_unique_token
-TWITCH_EBS_URL=https://ebs.bmberirl.com
-```
+1. Redirect you to Twitch to authorize the extension
+2. Automatically configure your server with the correct credentials
+3. Save the configuration to `twitch-config.json` (persists across restarts)
 
-#### 4. Configure your server
+That's it — no manual environment variables needed.
 
-Add the three environment variables to your server. If running via systemd on Linux:
+#### 4. Play PD2
 
-```bash
-sudo mkdir -p /etc/systemd/system/pd2-armory.service.d
-sudo tee /etc/systemd/system/pd2-armory.service.d/twitch.conf << 'EOF'
-[Service]
-Environment=TWITCH_CHANNEL_ID=your_channel_id
-Environment=TWITCH_PUSH_SECRET=your_unique_token
-Environment=TWITCH_EBS_URL=https://ebs.bmberirl.com
-EOF
-sudo systemctl daemon-reload
-sudo systemctl restart pd2-armory
-```
+Save & Exit in PD2 — your characters will appear in the Twitch panel within seconds. The panel auto-refreshes every 2 minutes.
 
-If running directly with Node.js on Windows:
+### Managing Your Connection
+
+- Visit **http://localhost:3001/setup** to check your connection status
+- Click **Disconnect** to unlink your Twitch account and clear saved credentials
+- Re-connect at any time by clicking **Connect to Twitch** again
+
+### Advanced: Manual Configuration
+
+If you prefer to set credentials manually (e.g. on a headless Linux server), you can set environment variables instead of using the setup page:
 
 ```bash
 # PowerShell
@@ -133,9 +129,7 @@ $env:TWITCH_EBS_URL = "https://ebs.bmberirl.com"
 node server.js
 ```
 
-#### 5. Play PD2
-
-Save & Exit in PD2 — your characters will appear in the Twitch panel within seconds. The panel auto-refreshes every 2 minutes.
+Environment variables take precedence over `twitch-config.json`.
 
 ## Updating Wiki Images
 

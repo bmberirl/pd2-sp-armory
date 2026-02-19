@@ -4,6 +4,7 @@
 //   GET  /data?channel_id=X    — Extension panel fetches character data (public)
 //   POST /register             — Broadcaster auto-registers via Twitch JWT → gets per-channel token
 //   GET  /admin/token?channel_id=X — Admin generates a token for a streamer (master secret auth)
+//   POST /oauth/token           — Exchange Twitch OAuth code for channel_id + push token
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +39,10 @@ export default {
 
     if (path === '/admin/token' && request.method === 'GET') {
       return handleAdminToken(request, env, url);
+    }
+
+    if (path === '/oauth/token' && request.method === 'POST') {
+      return handleOAuthToken(request, env);
     }
 
     return jsonResponse({ error: 'Not found' }, 404);
@@ -202,6 +207,81 @@ async function handleAdminToken(request, env, url) {
     channel_id: channelId,
     token: token,
     env_config: `TWITCH_CHANNEL_ID=${channelId}\nTWITCH_PUSH_SECRET=${token}\nTWITCH_EBS_URL=https://ebs.bmberirl.com`,
+  });
+}
+
+// OAuth code exchange: local server sends auth code, we exchange it with Twitch
+async function handleOAuthToken(request, env) {
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET) {
+    return jsonResponse({ error: 'TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET not configured' }, 500);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+
+  const { code, redirect_uri } = body;
+  if (!code || !redirect_uri) {
+    return jsonResponse({ error: 'Missing code or redirect_uri' }, 400);
+  }
+
+  // Exchange authorization code for access token
+  const tokenRes = await fetch('https://id.twitch.tv/oauth2/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.TWITCH_CLIENT_ID,
+      client_secret: env.TWITCH_CLIENT_SECRET,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri,
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    const err = await tokenRes.text();
+    return jsonResponse({ error: 'Twitch token exchange failed', details: err }, 400);
+  }
+
+  const tokenData = await tokenRes.json();
+  const accessToken = tokenData.access_token;
+
+  // Validate token to get user ID
+  const validateRes = await fetch('https://id.twitch.tv/oauth2/validate', {
+    headers: { 'Authorization': `OAuth ${accessToken}` },
+  });
+
+  if (!validateRes.ok) {
+    return jsonResponse({ error: 'Token validation failed' }, 400);
+  }
+
+  const validateData = await validateRes.json();
+  const userId = validateData.user_id;
+
+  if (!userId) {
+    return jsonResponse({ error: 'Could not determine user_id' }, 400);
+  }
+
+  // Generate per-channel push token
+  const pushToken = await generateToken(env.PUSH_SECRET, userId);
+
+  // Revoke the Twitch access token — we only needed it to get the user ID
+  await fetch('https://id.twitch.tv/oauth2/revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: env.TWITCH_CLIENT_ID,
+      token: accessToken,
+    }),
+  }).catch(() => {}); // best-effort revoke
+
+  return jsonResponse({
+    channel_id: userId,
+    token: pushToken,
+    ebs_url: 'https://ebs.bmberirl.com',
   });
 }
 

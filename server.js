@@ -12,10 +12,13 @@ const SAVES_DIR = process.env.SAVES_DIR || path.join(__dirname, 'saves');
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 
 // ── Twitch Cloud Push (optional) ────────────────────────────────────────────
-const TWITCH_CHANNEL_ID = process.env.TWITCH_CHANNEL_ID || '';
-const TWITCH_PUSH_SECRET = process.env.TWITCH_PUSH_SECRET || '';
-const TWITCH_EBS_URL = process.env.TWITCH_EBS_URL || '';
-const TWITCH_ENABLED = !!(TWITCH_CHANNEL_ID && TWITCH_PUSH_SECRET && TWITCH_EBS_URL);
+let TWITCH_CHANNEL_ID = process.env.TWITCH_CHANNEL_ID || '';
+let TWITCH_PUSH_SECRET = process.env.TWITCH_PUSH_SECRET || '';
+let TWITCH_EBS_URL = process.env.TWITCH_EBS_URL || '';
+let TWITCH_ENABLED = !!(TWITCH_CHANNEL_ID && TWITCH_PUSH_SECRET && TWITCH_EBS_URL);
+const TWITCH_CONFIG_PATH = path.join(__dirname, 'twitch-config.json');
+const TWITCH_CLIENT_ID = 'wlmury4i9mbawryxu06u6vtk8p1xnl';
+let oauthState = null; // transient, used during OAuth flow
 
 // ── State ──────────────────────────────────────────────────────────────────────
 const characters = new Map(); // name -> parsed character data
@@ -27,6 +30,31 @@ let vanillaConstants = null; // kept around for name lookups
 let classStats = {};          // className -> { toHitFactor, lifePerVit, manaPerEne, ... }
 let difficultyPenalties = {}; // 'Normal'|'Nightmare'|'Hell' -> { resistPenalty }
 let experienceTable = [];     // level index -> cumulative XP needed for that level
+
+// ── Twitch Config File Persistence ────────────────────────────────────────────
+function loadTwitchConfig() {
+  // Env vars take precedence over config file
+  if (TWITCH_ENABLED) return;
+  try {
+    if (fs.existsSync(TWITCH_CONFIG_PATH)) {
+      const json = JSON.parse(fs.readFileSync(TWITCH_CONFIG_PATH, 'utf8'));
+      if (json.channelId && json.pushSecret && json.ebsUrl) {
+        TWITCH_CHANNEL_ID = json.channelId;
+        TWITCH_PUSH_SECRET = json.pushSecret;
+        TWITCH_EBS_URL = json.ebsUrl;
+        TWITCH_ENABLED = true;
+        console.log('[TWITCH] Loaded config from twitch-config.json');
+      }
+    }
+  } catch (err) {
+    console.error('[TWITCH] Failed to load twitch-config.json:', err.message);
+  }
+}
+
+function saveTwitchConfig(channelId, pushSecret, ebsUrl) {
+  fs.writeFileSync(TWITCH_CONFIG_PATH, JSON.stringify({ channelId, pushSecret, ebsUrl }, null, 2));
+  console.log('[TWITCH] Saved config to twitch-config.json');
+}
 
 // ── D2S Library Initialization ─────────────────────────────────────────────────
 const CLASS_NAMES = ['Amazon', 'Sorceress', 'Necromancer', 'Paladin', 'Barbarian', 'Druid', 'Assassin'];
@@ -928,7 +956,7 @@ async function pushToCloud() {
       if (copy.equipped) {
         const eq = {};
         for (const [slot, item] of Object.entries(copy.equipped)) {
-          eq[slot] = { ...item, imageUrl: getWikiImageUrlAbsolute(item.name) || item.imageUrl };
+          eq[slot] = { ...item, imageUrl: getWikiImageUrlAbsolute(item.name) || getWikiImageUrlAbsolute(item.baseName) || null };
         }
         copy.equipped = eq;
       }
@@ -937,7 +965,7 @@ async function pushToCloud() {
       if (copy.mercenary?.items) {
         const merc = { ...copy.mercenary, items: {} };
         for (const [slot, item] of Object.entries(copy.mercenary.items)) {
-          merc.items[slot] = { ...item, imageUrl: getWikiImageUrlAbsolute(item.name) || item.imageUrl };
+          merc.items[slot] = { ...item, imageUrl: getWikiImageUrlAbsolute(item.name) || getWikiImageUrlAbsolute(item.baseName) || null };
         }
         copy.mercenary = merc;
       }
@@ -2199,6 +2227,157 @@ app.get('/api/character/:name', (req, res) => {
   res.json(char);
 });
 
+// ── Twitch Setup & OAuth Routes ───────────────────────────────────────────────
+
+app.get('/setup', (req, res) => {
+  const connected = TWITCH_ENABLED;
+  res.send(`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>PD2 Armory — Twitch Setup</title>
+<style>
+  body { background: #1a1a2e; color: #c4a862; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+  .card { background: #16213e; border: 2px solid #c4a862; border-radius: 8px; padding: 40px; max-width: 480px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+  h1 { margin: 0 0 8px; font-size: 22px; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 24px; }
+  .status { display: inline-block; padding: 6px 16px; border-radius: 4px; font-weight: bold; margin-bottom: 20px; }
+  .status.on { background: #1b4332; color: #52b788; border: 1px solid #52b788; }
+  .status.off { background: #3d0000; color: #e07070; border: 1px solid #e07070; }
+  .info { color: #aaa; font-size: 13px; margin-bottom: 20px; }
+  .btn { display: inline-block; padding: 12px 28px; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; text-decoration: none; transition: opacity .15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn-twitch { background: #9146ff; color: #fff; }
+  .btn-disconnect { background: #555; color: #fff; }
+  .back { display: block; margin-top: 20px; color: #888; font-size: 13px; text-decoration: none; }
+  .back:hover { color: #c4a862; }
+</style>
+</head><body>
+<div class="card">
+  <h1>Twitch Extension Setup</h1>
+  <p class="sub">PD2 Singleplayer Armory</p>
+  ${connected
+    ? `<div class="status on">Connected</div>
+       <p class="info">Channel ID: <strong>${TWITCH_CHANNEL_ID}</strong></p>
+       <form method="POST" action="/twitch/disconnect">
+         <button class="btn btn-disconnect" type="submit">Disconnect</button>
+       </form>`
+    : `<div class="status off">Not Connected</div>
+       <p class="info">Connect your Twitch account to automatically push character data to your Twitch extension panel.</p>
+       <a class="btn btn-twitch" href="/twitch/auth">Connect to Twitch</a>`
+  }
+  <a class="back" href="/">← Back to Armory</a>
+</div>
+</body></html>`);
+});
+
+app.get('/twitch/auth', (req, res) => {
+  oauthState = crypto.randomBytes(16).toString('hex');
+  const redirectUri = `http://localhost:${PORT}/twitch/callback`;
+  const params = new URLSearchParams({
+    client_id: TWITCH_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    state: oauthState,
+  });
+  res.redirect(`https://id.twitch.tv/oauth2/authorize?${params}`);
+});
+
+app.get('/twitch/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+
+  if (error) {
+    return res.status(400).send(errorPage('Authorization Denied', 'You denied the Twitch authorization request.'));
+  }
+
+  if (!state || state !== oauthState) {
+    return res.status(400).send(errorPage('Invalid State', 'OAuth state mismatch. Please try again from the setup page.'));
+  }
+  oauthState = null;
+
+  if (!code) {
+    return res.status(400).send(errorPage('Missing Code', 'No authorization code received from Twitch.'));
+  }
+
+  try {
+    const redirectUri = `http://localhost:${PORT}/twitch/callback`;
+    const ebsRes = await fetch('https://ebs.bmberirl.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, redirect_uri: redirectUri }),
+    });
+
+    if (!ebsRes.ok) {
+      const errData = await ebsRes.json().catch(() => ({}));
+      throw new Error(errData.error || `EBS returned ${ebsRes.status}`);
+    }
+
+    const { channel_id, token, ebs_url } = await ebsRes.json();
+
+    // Persist and enable
+    TWITCH_CHANNEL_ID = channel_id;
+    TWITCH_PUSH_SECRET = token;
+    TWITCH_EBS_URL = ebs_url;
+    TWITCH_ENABLED = true;
+    saveTwitchConfig(channel_id, token, ebs_url);
+
+    console.log(`[TWITCH] OAuth complete — connected as channel ${channel_id}`);
+    pushToCloud();
+
+    res.send(`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8"><meta http-equiv="refresh" content="3;url=/setup">
+<title>Connected!</title>
+<style>
+  body { background: #1a1a2e; color: #c4a862; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+  .card { background: #16213e; border: 2px solid #52b788; border-radius: 8px; padding: 40px; max-width: 420px; text-align: center; }
+  h1 { color: #52b788; margin: 0 0 12px; }
+  p { color: #aaa; }
+  a { color: #c4a862; }
+</style>
+</head><body>
+<div class="card">
+  <h1>Connected!</h1>
+  <p>Twitch channel <strong>${channel_id}</strong> linked successfully.</p>
+  <p>Redirecting to <a href="/setup">setup page</a>...</p>
+</div>
+</body></html>`);
+  } catch (err) {
+    console.error('[TWITCH] OAuth error:', err.message);
+    res.status(500).send(errorPage('Connection Failed', err.message));
+  }
+});
+
+app.post('/twitch/disconnect', (req, res) => {
+  try { fs.unlinkSync(TWITCH_CONFIG_PATH); } catch {}
+  TWITCH_CHANNEL_ID = '';
+  TWITCH_PUSH_SECRET = '';
+  TWITCH_EBS_URL = '';
+  TWITCH_ENABLED = false;
+  console.log('[TWITCH] Disconnected — config cleared');
+  res.redirect('/setup');
+});
+
+function errorPage(title, message) {
+  return `<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>Error</title>
+<style>
+  body { background: #1a1a2e; color: #c4a862; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+  .card { background: #16213e; border: 2px solid #e07070; border-radius: 8px; padding: 40px; max-width: 420px; text-align: center; }
+  h1 { color: #e07070; margin: 0 0 12px; }
+  p { color: #aaa; }
+  a { color: #c4a862; }
+</style>
+</head><body>
+<div class="card">
+  <h1>${title}</h1>
+  <p>${message}</p>
+  <p><a href="/setup">← Back to Setup</a></p>
+</div>
+</body></html>`;
+}
+
 // WebSocket connections
 const wsClients = new Set();
 wss.on('connection', (ws) => {
@@ -2254,6 +2433,7 @@ async function start() {
   console.log('  PD2 Singleplayer Character Armory');
   console.log('──────────────────────────────────────────');
 
+  loadTwitchConfig();
   if (TWITCH_ENABLED) {
     console.log(`[TWITCH] Cloud push enabled → ${TWITCH_EBS_URL} (channel ${TWITCH_CHANNEL_ID})`);
   }

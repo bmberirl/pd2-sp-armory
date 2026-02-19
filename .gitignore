@@ -1,5 +1,6 @@
 node_modules/
 saves/*.d2s
+twitch-config.json
 extracted-resources/
 extract-*.ps1
 search-strings.ps1
