@@ -24,8 +24,9 @@ let oauthState = null; // transient, used during OAuth flow
 const characters = new Map(); // name -> parsed character data
 let d2sRead = null;
 let d2sConstants = null;
-let uniqueNames = [];  // index -> unique item name (from UniqueItems.txt)
-let setItemNames = []; // index -> set item name (from SetItems.txt)
+let uniqueNames = [];    // index -> unique item name (from UniqueItems.txt)
+let setItemNames = [];   // index -> set item name (from SetItems.txt)
+let runewordNames = [];  // row# -> runeword display name (from Runes.txt)
 let vanillaConstants = null; // kept around for name lookups
 let classStats = {};          // className -> { toHitFactor, lifePerVit, manaPerEne, ... }
 let difficultyPenalties = {}; // 'Normal'|'Nightmare'|'Hell' -> { resistPenalty }
@@ -104,6 +105,42 @@ const PD2_ITEM_NAMES = {
 };
 
 // ── Parse name arrays from TXT files ────────────────────────────────────────
+function parseRunewordNames(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const header = lines[0].split('\t');
+  const internalIdx = header.indexOf('Name');
+  const displayIdx = header.indexOf('Rune Name');
+  if (displayIdx < 0) return [];
+  const arr = [];
+
+  // Pass 1: standard "RunewordN" entries — game stores libId (num + 25/26), matching d2s library formula
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split('\t');
+    const internal = cols[internalIdx]?.trim();
+    const display = cols[displayIdx]?.trim();
+    if (!internal || !display || !internal.startsWith('Runeword')) continue;
+    const num = +internal.substring(8);
+    const id = num > 75 ? num + 25 : num + 26;
+    if (!arr[id]) arr[id] = display; // first occurrence wins (handles duplicates)
+  }
+
+  // Pass 2: non-standard entries (no "RunewordN" name) — game stores row number
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split('\t');
+    const internal = cols[internalIdx]?.trim();
+    const display = cols[displayIdx]?.trim();
+    if (!internal || !display || internal.startsWith('Runeword')) continue;
+    if (!arr[i]) arr[i] = display; // row number (1-based, i starts at 1 for first data row)
+  }
+
+  // Explicit overrides for PD2 runewords stored with non-standard high IDs in save files
+  arr[3263] = 'Flickering Flame';
+  arr[3265] = 'Dominion';
+
+  return arr;
+}
+
 function parseTxtNames(filePath, nameCol = 'index') {
   if (!fs.existsSync(filePath)) return [];
   const lines = fs.readFileSync(filePath, 'utf8').split('\n');
@@ -882,7 +919,7 @@ function filenameToUrl(filename) {
 }
 
 function getWikiImageUrl(name) {
-  if (!name) return null;
+  if (!name || typeof name !== 'string') return null;
 
   // 1. Check manual overrides first (handles wiki naming mismatches)
   const override = WIKI_IMAGE_OVERRIDES[name];
@@ -917,7 +954,7 @@ function filenameToWikitideUrl(filename) {
 }
 
 function getWikiImageUrlAbsolute(name) {
-  if (!name) return null;
+  if (!name || typeof name !== 'string') return null;
 
   // 1. Check manual overrides
   const override = WIKI_IMAGE_OVERRIDES[name];
@@ -1113,6 +1150,7 @@ async function initD2S() {
     // Build name lookup arrays from PD2 TXT files
     uniqueNames = parseTxtNames(path.join(DATA_DIR, 'UniqueItems.txt'));
     setItemNames = parseTxtNames(path.join(DATA_DIR, 'SetItems.txt'));
+    runewordNames = parseRunewordNames(path.join(DATA_DIR, 'Runes.txt'));
     const pd2SkillNames = parseSkillNames(path.join(DATA_DIR, 'Skills.txt'));
     console.log(`[OK] Name lookups: ${uniqueNames.length} unique, ${setItemNames.length} set, ${Object.keys(pd2SkillNames).length} skills`);
 
@@ -1907,16 +1945,16 @@ function transformItem(item) {
     || d2sConstants?.other_items?.[item.type];
 
   // Base name from constants, with PD2 stacked item fallback
-  const baseName = details?.n || PD2_ITEM_NAMES[item.type] || item.type_name || item.type || 'Unknown';
+  // details.n can be a localization object in some vanilla constant bundles — coerce to string
+  const rawN = details?.n;
+  const baseName = (typeof rawN === 'string' ? rawN : null)
+    || PD2_ITEM_NAMES[item.type] || item.type_name || item.type || 'Unknown';
 
   // Build display name based on quality
   let displayName = baseName;
   if (item.given_runeword) {
-    // Runeword: look up by runeword_id if available
-    displayName = item.given_runeword;
-    if (d2sConstants?.runewords?.[item.runeword_id]?.n) {
-      displayName = d2sConstants.runewords[item.runeword_id].n;
-    }
+    // Runeword: runeword_id = row number (1-based) in Runes.txt
+    displayName = runewordNames[item.runeword_id] || baseName;
   } else if (item.quality === 7 && item.unique_id !== undefined) {
     // Unique item: look up in our name array from UniqueItems.txt
     displayName = uniqueNames[item.unique_id] || d2sConstants?.unq_items?.[item.unique_id]?.n || baseName;

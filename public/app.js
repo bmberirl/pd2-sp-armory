@@ -2,6 +2,7 @@
 let characters = [];
 let currentChar = null;
 let showMerc = false;
+let weaponSet = 1; // 1 = primary, 2 = switch
 let ws = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ elBtnPlayer.addEventListener('click', () => {
   showMerc = false;
   elBtnPlayer.classList.add('active');
   elBtnMerc.classList.remove('active');
+  document.querySelector('.inv-equip').classList.remove('merc-mode');
   if (currentChar) renderEquipment();
 });
 
@@ -96,14 +98,28 @@ elBtnMerc.addEventListener('click', () => {
   showMerc = true;
   elBtnMerc.classList.add('active');
   elBtnPlayer.classList.remove('active');
+  document.querySelector('.inv-equip').classList.add('merc-mode');
   if (currentChar) renderEquipment();
 });
+
+// ── Weapon Swap Tabs ──────────────────────────────────────────────────────────
+
+function setWeaponSet(n) {
+  weaponSet = n;
+  $$('.swap-tab').forEach(t => t.classList.remove('active'));
+  $$(`.stab-l${n}, .stab-r${n}`).forEach(t => t.classList.add('active'));
+  if (currentChar) renderEquipment();
+}
+
+$$('.stab-l1, .stab-r1').forEach(t => t.addEventListener('click', () => setWeaponSet(1)));
+$$('.stab-l2, .stab-r2').forEach(t => t.addEventListener('click', () => setWeaponSet(2)));
 
 // ── Render Character ──────────────────────────────────────────────────────────
 
 function renderCharacter() {
   if (!currentChar) return;
   elCharView.style.display = '';
+  setWeaponSet(1); // reset to primary set on character change
 
   // Info bar
   elCharName.textContent = currentChar.name;
@@ -224,7 +240,11 @@ function renderEquipment() {
   const slots = $$('.doll-slot');
 
   for (const slotEl of slots) {
-    const slotKey = slotEl.dataset.slot;
+    let slotKey = slotEl.dataset.slot;
+    if (!showMerc && weaponSet === 2) {
+      if (slotKey === 'rArm') slotKey = 'rArmSwitch';
+      else if (slotKey === 'lArm') slotKey = 'lArmSwitch';
+    }
     const label = slotEl.dataset.label;
     const item = items[slotKey];
 

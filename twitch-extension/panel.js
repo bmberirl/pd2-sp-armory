@@ -10,6 +10,7 @@ const POLL_INTERVAL = 120000; // 120 seconds
 let characters = [];
 let currentChar = null;
 let showMerc = false;
+let weaponSet = 1; // 1 = primary, 2 = switch
 let channelId = null;
 let pollTimer = null;
 
@@ -131,6 +132,7 @@ elBtnPlayer.addEventListener('click', function() {
   showMerc = false;
   elBtnPlayer.classList.add('active');
   elBtnMerc.classList.remove('active');
+  document.querySelector('.inv-equip').classList.remove('merc-mode');
   if (currentChar) renderEquipment();
 });
 
@@ -138,13 +140,27 @@ elBtnMerc.addEventListener('click', function() {
   showMerc = true;
   elBtnMerc.classList.add('active');
   elBtnPlayer.classList.remove('active');
+  document.querySelector('.inv-equip').classList.add('merc-mode');
   if (currentChar) renderEquipment();
 });
+
+// ── Weapon Swap Tabs ──────────────────────────────────────────────────────────
+
+function setWeaponSet(n) {
+  weaponSet = n;
+  $$('.swap-tab').forEach(function(t) { t.classList.remove('active'); });
+  $$('.stab-l' + n + ', .stab-r' + n).forEach(function(t) { t.classList.add('active'); });
+  if (currentChar) renderEquipment();
+}
+
+$$('.stab-l1, .stab-r1').forEach(function(t) { t.addEventListener('click', function() { setWeaponSet(1); }); });
+$$('.stab-l2, .stab-r2').forEach(function(t) { t.addEventListener('click', function() { setWeaponSet(2); }); });
 
 // ── Render Character ─────────────────────────────────────────────────────────
 
 function renderCharacter() {
   if (!currentChar) return;
+  setWeaponSet(1); // reset to primary set on character change
 
   elCharName.textContent = currentChar.name;
   elCharClass.textContent = currentChar.class;
@@ -226,6 +242,10 @@ function renderEquipment() {
   for (var i = 0; i < slots.length; i++) {
     var slotEl = slots[i];
     var slotKey = slotEl.dataset.slot;
+    if (!showMerc && weaponSet === 2) {
+      if (slotKey === 'rArm') slotKey = 'rArmSwitch';
+      else if (slotKey === 'lArm') slotKey = 'lArmSwitch';
+    }
     var label = slotEl.dataset.label;
     var item = items[slotKey];
 
