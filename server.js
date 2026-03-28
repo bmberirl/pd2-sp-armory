@@ -2795,6 +2795,16 @@ async function loadCharacter(filePath) {
   try {
     const char = await parseCharacter(filePath);
     if (char) {
+      if (char.level <= 2) {
+        // Skip mules / blank characters
+        const key = char.name.toLowerCase();
+        if (characters.has(key)) {
+          characters.delete(key);
+          broadcast('character_removed', { name: char.name });
+          pushToCloud();
+        }
+        return;
+      }
       const key = char.name.toLowerCase();
       characters.set(key, char);
       console.log(`[OK] Loaded: ${char.name} (Lv${char.level} ${char.class}) [${char._parseMethod}]`);
