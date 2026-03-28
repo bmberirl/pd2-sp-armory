@@ -14,9 +14,9 @@ param(
 
 # ── Configuration ────────────────────────────────────────────────────────────
 $SaveDir   = "C:\Program Files (x86)\Diablo II\Save"  # Adjust to your PD2 save directory
-$Server    = "YOUR_SERVER_IP"
+$Server    = "10.8.0.1"
 $ServerPath = "/opt/pd2-armory/saves/"
-$SshUser   = "root"
+$SshUser   = "ubuntu"
 
 function Sync-Saves {
     $files = Get-ChildItem -Path $SaveDir -Filter "*.d2s" -ErrorAction SilentlyContinue

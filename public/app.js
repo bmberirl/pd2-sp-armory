@@ -108,7 +108,10 @@ function setWeaponSet(n) {
   weaponSet = n;
   $$('.swap-tab').forEach(t => t.classList.remove('active'));
   $$(`.stab-l${n}, .stab-r${n}`).forEach(t => t.classList.add('active'));
-  if (currentChar) renderEquipment();
+  if (currentChar) {
+    renderStats();
+    renderEquipment();
+  }
 }
 
 $$('.stab-l1, .stab-r1').forEach(t => t.addEventListener('click', () => setWeaponSet(1)));
@@ -157,7 +160,9 @@ function addFlag(text, cls) {
 
 function renderStats() {
   const s = currentChar.stats || {};
-  const d = currentChar.derivedStats || {};
+  const d = (weaponSet === 2 && currentChar.derivedStatsSwap)
+    ? currentChar.derivedStatsSwap
+    : (currentChar.derivedStats || {});
 
   // Show total attributes (base + item bonuses) with green color when boosted
   setStat('#stat-str', d.totalStr ?? s.strength ?? 0, d.itemStr);

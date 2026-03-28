@@ -1428,7 +1428,8 @@ function getCurrentDifficulty(header) {
 }
 
 // Compute derived character stats from raw d2s data
-function computeCharDerivedStats(d2sData) {
+// overrideActiveArms: 0 = primary weapon set, 1 = alternate weapon set (overrides header.active_arms)
+function computeCharDerivedStats(d2sData, overrideActiveArms) {
   const header = d2sData.header || d2sData;
   const attrs = d2sData.attributes || {};
   const className = typeof header.class === 'string' ? header.class
@@ -1444,8 +1445,18 @@ function computeCharDerivedStats(d2sData) {
   const level = attrs.level ?? header.level ?? 1;
 
   // Gather all equipped items (raw, pre-transform)
+  // Only include the ACTIVE weapon set (primary=4,5 or alternate=11,12 based on active_arms)
   const playerItems = Array.isArray(d2sData.items) ? d2sData.items : [];
-  const equippedItems = playerItems.filter(it => it.location_id === 1 && it.equipped_id > 0 && it.equipped_id <= 12);
+  const activeArms = overrideActiveArms ?? header.active_arms ?? 0; // 0 = primary, 1 = secondary
+  const equippedItems = playerItems.filter(it => {
+    if (it.location_id !== 1 || it.equipped_id <= 0) return false;
+    const slot = it.equipped_id;
+    if (slot >= 1 && slot <= 3) return true;   // head, neck, body — always active
+    if (slot >= 6 && slot <= 10) return true;   // rings, belt, feet, gloves — always active
+    if (slot === 4 || slot === 5) return activeArms === 0;   // primary weapons — only if primary active
+    if (slot === 11 || slot === 12) return activeArms === 1; // alternate weapons — only if alternate active
+    return false;
+  });
   // Inventory items (charms provide passive bonuses)
   const inventoryItems = playerItems.filter(it => it.location_id === 0 && it.alt_position_id === 1);
 
@@ -1511,7 +1522,7 @@ function computeCharDerivedStats(d2sData) {
     if (d2sConstants?.armor_items?.[item.type]) {
       const details = d2sConstants.armor_items[item.type];
       let baseDef = item.defense_rating || details.maxac || 0;
-      if (item.ethereal && !item.defense_rating) baseDef = Math.floor(baseDef * 1.5);
+      if (item.ethereal && !item.defense_rating) baseDef = Math.floor(baseDef * 1.25);
       // Apply Enhanced Defense % (stat 16) from item's own attributes
       const edPct = sumItemStatId(item, 16);
       totalDefense += Math.floor(baseDef * (1 + edPct / 100));
@@ -1524,13 +1535,21 @@ function computeCharDerivedStats(d2sData) {
   }
   totalDefense += Math.floor(defPerLevel * level / 8);
 
-  // ── Resistances (with difficulty penalty) ──
+  // ── Resistances (with difficulty penalty + Anya quest bonus) ──
   const difficulty = getCurrentDifficulty(header);
   const resPenalty = difficultyPenalties[difficulty]?.resistPenalty || 0;
   fireRes += resPenalty;
   coldRes += resPenalty;
   ltngRes += resPenalty;
   poisRes += resPenalty;
+
+  // Anya's Scroll of Resistance: +10 all res per difficulty completed (Act V quest 3)
+  const questDifficulties = [header.quests_normal, header.quests_nm, header.quests_hell];
+  for (const q of questDifficulties) {
+    if (q?.act_v?.prison_of_ice?.is_completed) {
+      fireRes += 10; coldRes += 10; ltngRes += 10; poisRes += 10;
+    }
+  }
 
   // ── Attack Rating (uses total dex) ──
   const arFromLevels = Math.floor(arPerLevel * level / 2);
@@ -1643,8 +1662,9 @@ function transformD2SData(d2s, filename) {
     : (CLASS_NAMES[header.class] || `Class ${header.class}`);
   const status = header.status || {};
 
-  // Compute derived stats from raw item data
-  const derivedStats = computeCharDerivedStats(d2s);
+  // Compute derived stats for both weapon sets
+  const derivedStats = computeCharDerivedStats(d2s, 0);      // primary weapon set
+  const derivedStatsSwap = computeCharDerivedStats(d2s, 1);  // alternate weapon set
 
   return {
     name: header.name || filename,
@@ -1663,6 +1683,7 @@ function transformD2SData(d2s, filename) {
       items: mercItems,
     },
     derivedStats,
+    derivedStatsSwap,
     _parseMethod: 'full',
   };
 }
@@ -2018,14 +2039,14 @@ function transformItem(item) {
   if (d2sConstants?.armor_items?.[item.type]) {
     defense = item.defense_rating || details.maxac || null;
     if (defense && item.ethereal && !item.defense_rating) {
-      defense = Math.floor(defense * 1.5);
+      defense = Math.floor(defense * 1.25);
     }
   } else if (d2sConstants?.weapon_items?.[item.type]) {
     if (item.ethereal) {
-      minDamage = details.mind ? Math.floor(details.mind * 1.5) : null;
-      maxDamage = details.maxd ? Math.floor(details.maxd * 1.5) : null;
-      twoHandMin = details.min2d ? Math.floor(details.min2d * 1.5) : null;
-      twoHandMax = details.max2d ? Math.floor(details.max2d * 1.5) : null;
+      minDamage = details.mind ? Math.floor(details.mind * 1.25) : null;
+      maxDamage = details.maxd ? Math.floor(details.maxd * 1.25) : null;
+      twoHandMin = details.min2d ? Math.floor(details.min2d * 1.25) : null;
+      twoHandMax = details.max2d ? Math.floor(details.max2d * 1.25) : null;
     } else {
       minDamage = details.mind || null;
       maxDamage = details.maxd || null;
