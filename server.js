@@ -963,6 +963,7 @@ const WIKI_IMAGE_OVERRIDES = {
   // Elite gloves → normal wiki images
   'Bramble Mitts': 'Leather_Gloves',
   'Vampirebone Gloves': 'Heavy_Gloves',
+  'War Gauntlets': 'Chain_Gloves',
   'Ogre Gauntlets': 'Chain_Gloves',
   'Immortal King\'s Forge': 'Gauntlets',
   'Battle Gauntlets': 'Gauntlets',
@@ -1017,6 +1018,46 @@ const WIKI_IMAGE_OVERRIDES = {
   'Demon Heart': 'Eagle_Orb',
   'Vortex Orb': 'Smoked_Sphere',
   'Dimensional Shard': 'Sacred_Globe',
+
+  // Maps — T1
+  'Arreat Battlefield': 'Map_Icon_Arreat_Battlefield',
+  'Fall of Caldeum': 'Map_Icon_Fall_of_Caldeum',
+  'Halls of Torture': 'Map_Icon_Halls_of_Torture',
+  "Horazon's Memory": 'Map_Icon_Horazon\'s_Memory',
+  'Royal Crypts': 'Map_Icon_Royal_Crypts',
+  'Sewers of Harrogath': 'Map_Icon_Sewers_of_Harrogath',
+  'Shadows of Westmarch': 'Map_Icon_Shadows_of_Westmarch',
+  'Torajan Jungle': 'Map_Icon_Torajan_Jungle',
+  // Maps — T2
+  'Ancestral Trial': 'Map_Icon_Ancestral_Trial',
+  'Bastion Keep': 'Map_Icon_Bastion_Keep',
+  'Demon Road': 'Map_Icon_Demon_Road',
+  'Lost Temple': 'Map_Icon_Reziarfg\'s_Lair',
+  'Skovos Stronghold': 'Map_Icon_Skovos_Stronghold',
+  'River of Blood': 'Map_Icon_River_of_Blood',
+  'Ruins of Viz-Jun': 'Map_Icon_Ruins_of_Viz-Jun',
+  'Tomb of Zoltun Kulle': 'Map_Icon_Tomb_of_Zoltun_Kulle',
+  // Maps — T3
+  'Ashen Plains': 'Map_Icon_Ashen_Plains',
+  'Blood Moon': 'Map_Icon_Blood_Moon',
+  'Canyon of Sescheron': 'Map_Icon_Canyon_of_Sescheron',
+  'Kehjistan Marketplace': 'Map_Icon_Kehjistan_Marketplace',
+  'Pandemonium Citadel': 'Map_Icon_Pandemonium_Citadel',
+  'Phlegethon': 'Map_Icon_Phlegethon',
+  'Ruined Cistern': 'Map_Icon_Ruined_Cistern',
+  'Sanatorium': 'Map_Icon_Sanatorium',
+  'Throne of Insanity': 'Map_Icon_Throne_of_Insanity',
+  // Maps — T4 (Dungeons)
+  'Cathedral of Light': 'Map_Icon_Cathedral_of_Light',
+  'Plains of Torment': 'Map_Icon_Plains_of_Torment',
+  'Sanctuary of Sin': 'Map_Icon_Sanctuary_of_Sin',
+  'Steppes of Daken-Shar': 'Map_Icon_Steppes_of_Daken-Shar',
+  'City of Ureh': 'Map_Icon_City_of_Ureh',
+  'Fallen Gardens': 'Map_Icon_Fallen_Gardens',
+  'Imperial Palace': 'Map_Icon_Imperial_Palace',
+  'Outer Void': 'Map_Icon_Outer_Void',
+  'Warlord of Blood': 'Map_Icon_Stygian_Caverns',
+  "Zhar's Sanctum": 'Map_Icon_Zhar\'s_Sanctum',
 };
 
 async function fetchWikiImageList() {
