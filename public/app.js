@@ -91,7 +91,10 @@ elBtnPlayer.addEventListener('click', () => {
   elBtnPlayer.classList.add('active');
   elBtnMerc.classList.remove('active');
   document.querySelector('.inv-equip').classList.remove('merc-mode');
-  if (currentChar) renderEquipment();
+  if (currentChar) {
+    renderStats();
+    renderEquipment();
+  }
 });
 
 elBtnMerc.addEventListener('click', () => {
@@ -99,7 +102,10 @@ elBtnMerc.addEventListener('click', () => {
   elBtnMerc.classList.add('active');
   elBtnPlayer.classList.remove('active');
   document.querySelector('.inv-equip').classList.add('merc-mode');
-  if (currentChar) renderEquipment();
+  if (currentChar) {
+    renderStats();
+    renderEquipment();
+  }
 });
 
 // ── Weapon Swap Tabs ──────────────────────────────────────────────────────────
@@ -159,6 +165,50 @@ function addFlag(text, cls) {
 // ── Render Stats ──────────────────────────────────────────────────────────────
 
 function renderStats() {
+  const mercStats = currentChar.mercenary?.stats;
+
+  if (showMerc && mercStats) {
+    // Merc mode: show mercenary stats
+    setStat('#stat-str', mercStats.totalStr ?? 0, mercStats.itemStr);
+    setStat('#stat-dex', mercStats.totalDex ?? 0, mercStats.itemDex);
+    setStat('#stat-vit', '--', 0);
+    setStat('#stat-ene', '--', 0);
+
+    $('#stat-life').textContent = mercStats.totalLife ?? '--';
+    $('#stat-mana').textContent = '--';
+    $('#stat-stamina').textContent = '--';
+
+    // Show merc level/exp in the header area
+    $('#char-level').textContent = mercStats.level ?? '--';
+    $('#stat-exp').textContent = (mercStats.experience || 0).toLocaleString();
+    $('#stat-gold').textContent = '--';
+    $('#stat-statpts').textContent = '--';
+    $('#stat-skillpts').textContent = '--';
+
+    $('#stat-defense').textContent = mercStats.defense ?? '--';
+    $('#stat-fire-res').textContent = mercStats.fireRes ?? '--';
+    $('#stat-cold-res').textContent = mercStats.coldRes ?? '--';
+    $('#stat-ltng-res').textContent = mercStats.ltngRes ?? '--';
+    $('#stat-pois-res').textContent = mercStats.poisRes ?? '--';
+
+    const elAR = $('#stat-attack-rating');
+    if (elAR) elAR.textContent = mercStats.attackRating ?? '--';
+
+    const elNextLvl = $('#stat-next-level');
+    if (elNextLvl) elNextLvl.textContent = '--';
+
+    // Update header to show merc type
+    const mercLabel = mercStats.mercType || 'Mercenary';
+    elCharClass.textContent = mercLabel;
+    elCharName.textContent = currentChar.name;
+    return;
+  }
+
+  // Player mode: restore header
+  elCharName.textContent = currentChar.name;
+  elCharClass.textContent = currentChar.class;
+  $('#char-level').textContent = currentChar.level;
+
   const s = currentChar.stats || {};
   const d = (weaponSet === 2 && currentChar.derivedStatsSwap)
     ? currentChar.derivedStatsSwap

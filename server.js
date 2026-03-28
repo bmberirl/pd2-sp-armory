@@ -31,6 +31,7 @@ let vanillaConstants = null; // kept around for name lookups
 let classStats = {};          // className -> { toHitFactor, lifePerVit, manaPerEne, ... }
 let difficultyPenalties = {}; // 'Normal'|'Nightmare'|'Hell' -> { resistPenalty }
 let experienceTable = [];     // level index -> cumulative XP needed for that level
+let hirelingData = [];        // parsed Hireling.txt rows (Id, level breakpoints, stats)
 
 // ── Twitch Config File Persistence ────────────────────────────────────────────
 function loadTwitchConfig() {
@@ -238,6 +239,169 @@ function parseExperienceFile(filePath) {
     table[level] = parseInt(cells[1]) || 0;
   }
   return table;
+}
+
+// Parse Hireling.txt → array of merc type rows with level breakpoints and stat scaling
+function parseHirelingFile(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const header = lines[0].split('\t');
+  const col = (name) => header.indexOf(name);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const name = cells[col('Hireling')]?.trim();
+    if (!name) continue;
+    rows.push({
+      name,
+      subType: cells[col('SubType')]?.trim() || '',
+      version: parseInt(cells[col('Version')]) || 0,
+      id: parseInt(cells[col('Id')]) || 0,
+      act: parseInt(cells[col('Act')]) || 1,
+      difficulty: parseInt(cells[col('Difficulty')]) || 1,
+      level: parseInt(cells[col('Level')]) || 1,
+      expPerLvl: parseInt(cells[col('Exp/Lvl')]) || 100,
+      hp: parseInt(cells[col('HP')]) || 0,
+      hpPerLvl: parseInt(cells[col('HP/Lvl')]) || 0,
+      defense: parseInt(cells[col('Defense')]) || 0,
+      defPerLvl: parseInt(cells[col('Def/Lvl')]) || 0,
+      str: parseInt(cells[col('Str')]) || 0,
+      strPerLvl: parseInt(cells[col('Str/Lvl')]) || 0,
+      dex: parseInt(cells[col('Dex')]) || 0,
+      dexPerLvl: parseInt(cells[col('Dex/Lvl')]) || 0,
+      ar: parseInt(cells[col('AR')]) || 0,
+      arPerLvl: parseInt(cells[col('AR/Lvl')]) || 0,
+      resist: parseInt(cells[col('Resist')]) || 0,
+      resistPerLvl: parseInt(cells[col('Resist/Lvl')]) || 0,
+      dmgMin: parseInt(cells[col('Dmg-Min')]) || 0,
+      dmgMax: parseInt(cells[col('Dmg-Max')]) || 0,
+      dmgPerLvl: parseInt(cells[col('Dmg/Lvl')]) || 0,
+    });
+  }
+  return rows;
+}
+
+// Get merc level from experience using the player XP table
+function getMercLevel(mercExp) {
+  if (!mercExp || mercExp <= 0) return 1;
+  for (let lvl = experienceTable.length - 1; lvl >= 1; lvl--) {
+    if (experienceTable[lvl] && mercExp >= experienceTable[lvl]) return lvl;
+  }
+  return 1;
+}
+
+// Find the matching hireling row(s) for a given merc_type and interpolate stats at the given level
+function getMercBaseStats(mercType, mercLevel) {
+  // Find all rows matching this merc type ID, preferring version=100 (PD2) rows
+  const pd2Rows = hirelingData.filter(r => r.id === mercType && r.version === 100);
+  const rows = pd2Rows.length > 0 ? pd2Rows : hirelingData.filter(r => r.id === mercType);
+  if (rows.length === 0) return null;
+
+  // Find the appropriate level breakpoint row (last row where level <= mercLevel)
+  let row = rows[0];
+  for (const r of rows) {
+    if (r.level <= mercLevel) row = r;
+  }
+
+  const levelsAbove = Math.max(0, mercLevel - row.level);
+  return {
+    name: row.name,
+    subType: row.subType,
+    act: row.act,
+    hp: row.hp + levelsAbove * row.hpPerLvl,
+    defense: row.defense + levelsAbove * row.defPerLvl,
+    str: row.str + levelsAbove * row.strPerLvl,
+    dex: row.dex + levelsAbove * row.dexPerLvl,
+    ar: row.ar + levelsAbove * row.arPerLvl,
+    resist: row.resist + levelsAbove * row.resistPerLvl,
+    dmgMin: row.dmgMin + levelsAbove * row.dmgPerLvl,
+    dmgMax: row.dmgMax + levelsAbove * row.dmgPerLvl,
+  };
+}
+
+// Compute mercenary derived stats from d2s header + merc items
+function computeMercDerivedStats(d2sData) {
+  const header = d2sData.header || d2sData;
+  if (!header.merc_id || parseInt(header.merc_id, 16) === 0) return null;
+
+  const mercType = header.merc_type;
+  const mercExp = header.merc_experience || 0;
+  const mercLevel = getMercLevel(mercExp);
+  const base = getMercBaseStats(mercType, mercLevel);
+  if (!base) return null;
+
+  // Sum item bonuses from merc equipment
+  const mercItems = Array.isArray(d2sData.merc_items) ? d2sData.merc_items : [];
+  let itemStr = 0, itemDex = 0, itemLife = 0;
+  let flatDefense = 0, flatAR = 0, pctAR = 0;
+  let fireRes = 0, coldRes = 0, ltngRes = 0, poisRes = 0;
+  let pctLife = 0, lifePerLevel = 0, arPerLevel = 0, defPerLevel = 0;
+
+  for (const item of mercItems) {
+    itemStr += sumItemStatId(item, 0);
+    itemDex += sumItemStatId(item, 2);
+    itemLife += sumItemStatId(item, 7);
+    flatDefense += sumItemStatId(item, 31);
+    flatAR += sumItemStatId(item, 19);
+    pctAR += sumItemStatId(item, 119);
+    fireRes += sumItemStatId(item, 39);
+    ltngRes += sumItemStatId(item, 41);
+    coldRes += sumItemStatId(item, 43);
+    poisRes += sumItemStatId(item, 45);
+    pctLife += sumItemStatId(item, 76);
+    lifePerLevel += sumItemStatId(item, 216);
+    arPerLevel += sumItemStatId(item, 224);
+    defPerLevel += sumItemStatId(item, 214);
+  }
+
+  const totalStr = base.str + itemStr;
+  const totalDex = base.dex + itemDex;
+
+  // Life: base HP + item flat + per-level + % bonus
+  const lifeFromLevels = Math.floor(lifePerLevel * mercLevel / 8);
+  const rawLife = base.hp + itemLife + lifeFromLevels;
+  const totalLife = Math.floor(rawLife * (1 + pctLife / 100));
+
+  // Defense: base + dex bonus + item flat + armor pieces
+  let totalDefense = base.defense + Math.floor(totalDex / 4) + flatDefense;
+  for (const item of mercItems) {
+    if (d2sConstants?.armor_items?.[item.type]) {
+      const details = d2sConstants.armor_items[item.type];
+      let baseDef = item.defense_rating || details.maxac || 0;
+      if (item.ethereal && !item.defense_rating) baseDef = Math.floor(baseDef * 1.25);
+      const edPct = sumItemStatId(item, 16);
+      totalDefense += Math.floor(baseDef * (1 + edPct / 100));
+    }
+  }
+  totalDefense += Math.floor(defPerLevel * mercLevel / 8);
+
+  // Attack rating: base + dex scaling + item bonuses
+  const arFromLevels = Math.floor(arPerLevel * mercLevel / 2);
+  const baseAR = base.ar + flatAR + arFromLevels;
+  const attackRating = Math.max(0, Math.floor(baseAR * (1 + pctAR / 100)));
+
+  // Resistances: base + items + difficulty penalty
+  const difficulty = getCurrentDifficulty(header);
+  const resPenalty = difficultyPenalties[difficulty]?.resistPenalty || 0;
+  fireRes += base.resist + resPenalty;
+  coldRes += base.resist + resPenalty;
+  ltngRes += base.resist + resPenalty;
+  poisRes += base.resist + resPenalty;
+
+  return {
+    mercType: base.name,
+    mercSubType: base.subType,
+    mercAct: base.act,
+    level: mercLevel,
+    experience: mercExp,
+    dead: header.dead_merc ? true : false,
+    totalStr, totalDex,
+    itemStr, itemDex,
+    totalLife,
+    defense: totalDefense,
+    fireRes, coldRes, ltngRes, poisRes,
+    attackRating,
+  };
 }
 
 // ── PD2 Wiki Image URL Helper ─────────────────────────────────────────────
@@ -1158,7 +1322,8 @@ async function initD2S() {
     classStats = parseCharStatsFile(path.join(DATA_DIR, 'CharStats.txt'));
     difficultyPenalties = parseDifficultyFile(path.join(DATA_DIR, 'DifficultyLevels.txt'));
     experienceTable = parseExperienceFile(path.join(DATA_DIR, 'Experience.txt'));
-    console.log(`[OK] Game data: ${Object.keys(classStats).length} classes, ${experienceTable.length - 1} XP levels, ${Object.keys(difficultyPenalties).length} difficulties`);
+    hirelingData = parseHirelingFile(path.join(DATA_DIR, 'Hireling.txt'));
+    console.log(`[OK] Game data: ${Object.keys(classStats).length} classes, ${experienceTable.length - 1} XP levels, ${Object.keys(difficultyPenalties).length} difficulties, ${hirelingData.length} hireling rows`);
 
     // Load PD2 TXT data files
     if (fs.existsSync(DATA_DIR)) {
@@ -1681,6 +1846,7 @@ function transformD2SData(d2s, filename) {
     inventory,
     mercenary: {
       items: mercItems,
+      stats: computeMercDerivedStats(d2s),
     },
     derivedStats,
     derivedStatsSwap,
