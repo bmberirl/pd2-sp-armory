@@ -718,6 +718,12 @@ body {
   text-align: right;
 }
 
+.skill-bonus {
+  color: #6888ff;
+  font-size: 0.85em;
+  margin-left: 1px;
+}
+
 .muted {
   color: var(--text-dim);
   font-family: var(--font-d2);

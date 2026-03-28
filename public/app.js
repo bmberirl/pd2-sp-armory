@@ -272,15 +272,18 @@ function renderSkills() {
   }
   elNoSkills.style.display = 'none';
 
-  // Sort by points descending
-  const sorted = [...skills].sort((a, b) => b.points - a.points);
+  // Sort by total (base + bonus) descending
+  const sorted = [...skills].sort((a, b) => (b.points + (b.bonus || 0)) - (a.points + (a.bonus || 0)));
   for (const sk of sorted) {
     const el = document.createElement('div');
     el.className = 'skill-entry';
     const iconHtml = sk.imageUrl
       ? `<img class="skill-icon" src="${esc(sk.imageUrl)}" alt="" onerror="this.style.display='none'">`
       : '';
-    el.innerHTML = `<span class="skill-name">${iconHtml}${esc(sk.name)}</span><span class="skill-points">${sk.points}</span>`;
+    const bonusHtml = sk.bonus > 0
+      ? `<span class="skill-points">${sk.points}<span class="skill-bonus">+${sk.bonus}</span></span>`
+      : `<span class="skill-points">${sk.points}</span>`;
+    el.innerHTML = `<span class="skill-name">${iconHtml}${esc(sk.name)}</span>${bonusHtml}`;
     elSkillsList.appendChild(el);
   }
 }

@@ -32,6 +32,9 @@ let classStats = {};          // className -> { toHitFactor, lifePerVit, manaPer
 let difficultyPenalties = {}; // 'Normal'|'Nightmare'|'Hell' -> { resistPenalty }
 let experienceTable = [];     // level index -> cumulative XP needed for that level
 let hirelingData = [];        // parsed Hireling.txt rows (Id, level breakpoints, stats)
+let skillTabMap = {};         // skillId -> { classCode, tabWithinClass } for +skill tab bonuses
+const CLASS_CODE_TO_ID = { ama: 0, sor: 1, nec: 2, pal: 3, bar: 4, dru: 5, ass: 6 };
+const CLASS_NAME_TO_CODE = { Amazon: 'ama', Sorceress: 'sor', Necromancer: 'nec', Paladin: 'pal', Barbarian: 'bar', Druid: 'dru', Assassin: 'ass' };
 
 // ── Twitch Config File Persistence ────────────────────────────────────────────
 function loadTwitchConfig() {
@@ -402,6 +405,123 @@ function computeMercDerivedStats(d2sData) {
     fireRes, coldRes, ltngRes, poisRes,
     attackRating,
   };
+}
+
+// Parse Skills.txt + SkillDesc.txt → skillId -> { classCode, tabWithinClass }
+function parseSkillTabMap(skillsPath, skillDescPath) {
+  if (!fs.existsSync(skillsPath) || !fs.existsSync(skillDescPath)) return {};
+
+  // Build skilldesc -> SkillPage map from SkillDesc.txt
+  const descLines = fs.readFileSync(skillDescPath, 'utf8').split('\n');
+  const dHdr = descLines[0].split('\t');
+  const dNameCol = dHdr.indexOf('skilldesc');
+  const dPageCol = dHdr.indexOf('SkillPage');
+  const descPage = {};
+  for (let i = 1; i < descLines.length; i++) {
+    const cells = descLines[i].split('\t');
+    const dn = cells[dNameCol]?.trim();
+    const dp = parseInt(cells[dPageCol]);
+    if (dn && dp > 0) descPage[dn] = dp;
+  }
+
+  // Build skillId -> { classCode, tabWithinClass } from Skills.txt
+  const lines = fs.readFileSync(skillsPath, 'utf8').split('\n');
+  const hdr = lines[0].split('\t');
+  const idCol = hdr.indexOf('Id') >= 0 ? hdr.indexOf('Id') : hdr.indexOf('*Id');
+  const classCol = hdr.indexOf('charclass');
+  const descCol = hdr.indexOf('skilldesc');
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const sid = parseInt(cells[idCol]);
+    const sclass = cells[classCol]?.trim();
+    const sdesc = cells[descCol]?.trim();
+    if (isNaN(sid) || !sclass || !(sclass in CLASS_CODE_TO_ID)) continue;
+    const page = descPage[sdesc];
+    if (!page) continue;
+    result[sid] = { classCode: sclass, tabWithinClass: page - 1 }; // 0-indexed tab within class
+  }
+  return result;
+}
+
+// Compute +skill bonuses from all equipped items + charms
+// Returns map: skillId -> bonus amount
+function computeSkillBonuses(d2sData, classCode, skills) {
+  const header = d2sData.header || d2sData;
+  const numericClassId = CLASS_CODE_TO_ID[classCode] ?? -1;
+
+  // Gather equipped items (primary weapon set) + inventory charms
+  const playerItems = Array.isArray(d2sData.items) ? d2sData.items : [];
+  const equippedItems = playerItems.filter(it => {
+    if (it.location_id !== 1 || it.equipped_id <= 0) return false;
+    const slot = it.equipped_id;
+    // Include all non-swap slots + primary weapon set
+    return (slot >= 1 && slot <= 10);
+  });
+  const inventoryItems = playerItems.filter(it => it.location_id === 0 && it.alt_position_id === 1);
+  const allItems = [...equippedItems, ...inventoryItems];
+
+  // Accumulators
+  let allSkillsBonus = 0;
+  let classSkillsBonus = 0;
+  const tabBonuses = [0, 0, 0]; // 3 tabs per class
+  const singleBonuses = {};     // skillId -> amount
+
+  for (const item of allItems) {
+    const sources = [item.magic_attributes, item.runeword_attributes];
+    if (item.socketed_items) {
+      for (const si of item.socketed_items) {
+        if (si.magic_attributes) sources.push(si.magic_attributes);
+      }
+    }
+    if (item.set_attributes) {
+      for (const setAttrs of item.set_attributes) {
+        if (Array.isArray(setAttrs)) sources.push(setAttrs);
+      }
+    }
+
+    for (const attrs of sources) {
+      if (!Array.isArray(attrs)) continue;
+      for (const a of attrs) {
+        const v = a.values;
+        if (!v || v.length === 0) continue;
+        switch (a.id) {
+          case 127: // item_allskills: values = [amount]
+            allSkillsBonus += v[0];
+            break;
+          case 83:  // item_addclassskills: values = [classId, amount]
+            if (v[0] === numericClassId) classSkillsBonus += v[1];
+            break;
+          case 188: // item_addskill_tab: values = [tabWithinClass, classId, amount]
+            if (v[1] === numericClassId && v[0] >= 0 && v[0] <= 2) {
+              tabBonuses[v[0]] += v[2];
+            }
+            break;
+          case 107: // item_singleskill: values = [skillId, amount]
+            if (skillTabMap[v[0]]?.classCode === classCode) {
+              singleBonuses[v[0]] = (singleBonuses[v[0]] || 0) + v[1];
+            }
+            break;
+          case 97:  // item_nonclassskill (oskill): values = [skillId, amount]
+            singleBonuses[v[0]] = (singleBonuses[v[0]] || 0) + v[1];
+            break;
+        }
+      }
+    }
+  }
+
+  // Compute total bonus per skill
+  const result = {};
+  for (const sk of skills) {
+    const tab = skillTabMap[sk.id];
+    let bonus = allSkillsBonus + classSkillsBonus;
+    if (tab && tab.classCode === classCode) {
+      bonus += tabBonuses[tab.tabWithinClass] || 0;
+    }
+    bonus += singleBonuses[sk.id] || 0;
+    if (bonus > 0) result[sk.id] = bonus;
+  }
+  return result;
 }
 
 // ── PD2 Wiki Image URL Helper ─────────────────────────────────────────────
@@ -1364,7 +1484,8 @@ async function initD2S() {
     difficultyPenalties = parseDifficultyFile(path.join(DATA_DIR, 'DifficultyLevels.txt'));
     experienceTable = parseExperienceFile(path.join(DATA_DIR, 'Experience.txt'));
     hirelingData = parseHirelingFile(path.join(DATA_DIR, 'Hireling.txt'));
-    console.log(`[OK] Game data: ${Object.keys(classStats).length} classes, ${experienceTable.length - 1} XP levels, ${Object.keys(difficultyPenalties).length} difficulties, ${hirelingData.length} hireling rows`);
+    skillTabMap = parseSkillTabMap(path.join(DATA_DIR, 'Skills.txt'), path.join(DATA_DIR, 'SkillDesc.txt'));
+    console.log(`[OK] Game data: ${Object.keys(classStats).length} classes, ${experienceTable.length - 1} XP levels, ${Object.keys(difficultyPenalties).length} difficulties, ${hirelingData.length} hireling rows, ${Object.keys(skillTabMap).length} skill tabs`);
 
     // Load PD2 TXT data files
     if (fs.existsSync(DATA_DIR)) {
@@ -1867,6 +1988,13 @@ function transformD2SData(d2s, filename) {
   const className = typeof header.class === 'string' ? header.class
     : (CLASS_NAMES[header.class] || `Class ${header.class}`);
   const status = header.status || {};
+
+  // Compute +skill bonuses from gear
+  const classCode = CLASS_NAME_TO_CODE[className] || '';
+  const skillBonuses = computeSkillBonuses(d2s, classCode, skills);
+  for (const sk of skills) {
+    sk.bonus = skillBonuses[sk.id] || 0;
+  }
 
   // Compute derived stats for both weapon sets
   const derivedStats = computeCharDerivedStats(d2s, 0);      // primary weapon set
