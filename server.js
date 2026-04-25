@@ -3051,6 +3051,7 @@ async function start() {
     if (characters.delete(name)) {
       console.log(`[FILE] Removed: ${name}`);
       broadcast('character_removed', { name });
+      scheduleCloudPush(); // push removal to Twitch KV
     }
   });
 
