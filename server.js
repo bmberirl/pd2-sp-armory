@@ -33,6 +33,9 @@ let difficultyPenalties = {}; // 'Normal'|'Nightmare'|'Hell' -> { resistPenalty 
 let experienceTable = [];     // level index -> cumulative XP needed for that level
 let hirelingData = [];        // parsed Hireling.txt rows (Id, level breakpoints, stats)
 let skillTabMap = {};         // skillId -> { classCode, tabWithinClass } for +skill tab bonuses
+let uniqueStatRanges = [];   // uniqueId -> [{ statName, min, max }, ...] for corruption detection
+let setStatRanges = [];      // setItemId -> [{ statName, min, max }, ...]
+let propToStats = {};        // prop code -> [{ statName, func }, ...] from Properties.txt
 const CLASS_CODE_TO_ID = { ama: 0, sor: 1, nec: 2, pal: 3, bar: 4, dru: 5, ass: 6 };
 const CLASS_NAME_TO_CODE = { Amazon: 'ama', Sorceress: 'sor', Necromancer: 'nec', Paladin: 'pal', Barbarian: 'bar', Druid: 'dru', Assassin: 'ass' };
 
@@ -407,11 +410,11 @@ function computeMercDerivedStats(d2sData) {
   };
 }
 
-// Parse Skills.txt + SkillDesc.txt → skillId -> { classCode, tabWithinClass }
+// Parse Skills.txt + Skilldesc.txt → skillId -> { classCode, tabWithinClass }
 function parseSkillTabMap(skillsPath, skillDescPath) {
   if (!fs.existsSync(skillsPath) || !fs.existsSync(skillDescPath)) return {};
 
-  // Build skilldesc -> SkillPage map from SkillDesc.txt
+  // Build skilldesc -> SkillPage map from Skilldesc.txt
   const descLines = fs.readFileSync(skillDescPath, 'utf8').split('\n');
   const dHdr = descLines[0].split('\t');
   const dNameCol = dHdr.indexOf('skilldesc');
@@ -442,6 +445,98 @@ function parseSkillTabMap(skillsPath, skillDescPath) {
     result[sid] = { classCode: sclass, tabWithinClass: page - 1 }; // 0-indexed tab within class
   }
   return result;
+}
+
+// ── Corruption Detection: Parse item stat ranges from TXT files ────────────
+// Properties.txt: prop code → stat names it generates
+function parsePropertiesToStats(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const hdr = lines[0].split('\t');
+  const codeCol = hdr.indexOf('code');
+  const result = {};
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const code = cells[codeCol]?.trim();
+    if (!code) continue;
+    const stats = [];
+    for (let s = 1; s <= 7; s++) {
+      const funcCol = hdr.indexOf(`func${s}`);
+      const statCol = hdr.indexOf(`stat${s}`);
+      if (funcCol < 0 || statCol < 0) continue;
+      const func = parseInt(cells[funcCol]) || 0;
+      const stat = cells[statCol]?.trim();
+      if (stat && func > 0) stats.push({ statName: stat, func });
+    }
+    if (stats.length > 0) result[code] = stats;
+  }
+  return result;
+}
+
+// Parse UniqueItems.txt or SetItems.txt → array of stat ranges per item row
+// Returns: [ row0: [{statName, min, max, prop}, ...], row1: [...], ... ]
+function parseItemStatRanges(filePath, maxProps) {
+  if (!fs.existsSync(filePath)) return [];
+  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const hdr = lines[0].split('\t');
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split('\t');
+    const name = cells[0]?.trim();
+    if (!name || name === 'Expansion') continue;
+    const ranges = [];
+    for (let p = 1; p <= maxProps; p++) {
+      const propCol = hdr.indexOf(`prop${p}`);
+      const parCol = hdr.indexOf(`par${p}`);
+      const minCol = hdr.indexOf(`min${p}`);
+      const maxCol = hdr.indexOf(`max${p}`);
+      if (propCol < 0) continue;
+      const prop = cells[propCol]?.trim();
+      if (!prop) continue;
+      const par = cells[parCol]?.trim() || '';
+      let mn = parseInt(cells[minCol]) || 0;
+      let mx = parseInt(cells[maxCol]) || 0;
+      // Some props use par as value when min/max are empty (e.g. rep-dur, charged)
+      // For corruption detection, if both min and max are 0 but par has a numeric value,
+      // use par as range to avoid false positives
+      const parNum = parseInt(par);
+      if (mn === 0 && mx === 0 && !isNaN(parNum) && parNum !== 0) {
+        mn = parNum;
+        mx = parNum;
+      }
+      // Resolve prop → stat names via Properties.txt
+      const statMappings = propToStats[prop];
+      if (statMappings) {
+        for (const sm of statMappings) {
+          ranges.push({ statName: sm.statName, min: mn, max: mx, prop, par });
+        }
+      } else {
+        // Fallback: prop code itself might be a stat name
+        ranges.push({ statName: prop, min: mn, max: mx, prop, par });
+      }
+    }
+    result.push(ranges);
+  }
+  return result;
+}
+
+// Check if a stat on a corrupted item exceeds known base ranges or is entirely new
+// Returns true if this stat appears to be the corruption mod
+function isCorruptedStat(statName, statValues, baseRanges) {
+  if (!baseRanges || baseRanges.length === 0) return false;
+  // Find matching base range entries for this stat
+  const matches = baseRanges.filter(r => r.statName === statName);
+  if (matches.length === 0) {
+    // Stat not in base item definition → corruption added it
+    return true;
+  }
+  // If stat exists in base, check if current value exceeds the max roll
+  // The actual value is typically the last element in the values array
+  const val = statValues[statValues.length - 1];
+  // Sum all matching max values (some items have same stat from multiple props)
+  const totalMax = matches.reduce((sum, m) => sum + Math.max(m.min, m.max), 0);
+  if (val > totalMax) return true;
+  return false;
 }
 
 // Compute +skill bonuses from all equipped items + charms
@@ -550,6 +645,7 @@ const WIKI_IMAGE_OVERRIDES = {
   "Halaberd's Reign": 'Assault_Helmet',
   "Jalal's Mane": 'Spirit_Mask',
   'Spirit Keeper': 'Antlers',
+  "Sage's Defiance": 'Sagedef',  // S13 Betrayal — wiki filename is abbreviated
   // Swords
   'Bloodletter': "Rixot's_Keen",
   'Coldsteel Eye': 'Blood_Crescent',
@@ -761,6 +857,9 @@ const WIKI_IMAGE_OVERRIDES = {
   'Sword Mastery': 'Polearm_and_Spear_Mastery', 'Axe Mastery': 'Polearm_and_Spear_Mastery',
   'Mace Mastery': 'Polearm_and_Spear_Mastery', 'Polearm Mastery': 'Polearm_and_Spear_Mastery',
   'Spear Mastery': 'Polearm_and_Spear_Mastery', 'Bow and Crossbow Mastery': 'Polearm_and_Spear_Mastery',
+  // S13 Betrayal — Barb mastery renames; reuse old icons until wiki updates
+  'One Hand Mastery': 'General_Mastery',
+  'Two Hand Mastery': 'Polearm_and_Spear_Mastery',
 
   // Normal helms with wiki _D2 suffix
   'Cap': 'Cap_D2',
@@ -1305,13 +1404,35 @@ function getWikiImageUrlAbsolute(name) {
   return null;
 }
 
+// ── Character list sorted by most recently modified ─────────────────────────
+function getSortedCharacters() {
+  return Array.from(characters.values()).sort((a, b) => (b._lastModified || 0) - (a._lastModified || 0));
+}
+
+// ── Throttled cloud push — pushes at most once every 120s ───────────────────
+let cloudDirty = false;
+let cloudPushTimer = null;
+
+function scheduleCloudPush() {
+  cloudDirty = true;
+  if (!cloudPushTimer) {
+    cloudPushTimer = setInterval(async () => {
+      if (cloudDirty) {
+        cloudDirty = false;
+        await pushToCloud();
+      }
+    }, 120000);
+  }
+}
+
 async function pushToCloud() {
   if (!TWITCH_ENABLED) return;
 
   try {
-    // Collect all characters, shallow-copy and rewrite image URLs to absolute
+    // Collect all characters sorted by most recently modified
     const payload = [];
-    for (const [, char] of characters) {
+    const sorted = getSortedCharacters();
+    for (const char of sorted) {
       const copy = { ...char };
 
       // Rewrite equipped item image URLs
@@ -1340,8 +1461,14 @@ async function pushToCloud() {
         }));
       }
 
-      // Drop inventory (not shown in panel, saves bandwidth)
-      delete copy.inventory;
+      // Rewrite inventory item image URLs
+      if (copy.inventory) {
+        copy.inventory = copy.inventory.map(function(item) {
+          return Object.assign({}, item, {
+            imageUrl: getWikiImageUrlAbsolute(item.name) || getWikiImageUrlAbsolute(item.baseName) || null
+          });
+        });
+      }
 
       payload.push(copy);
     }
@@ -1369,6 +1496,7 @@ async function pushToCloud() {
 // Fallback description strings for PD2-specific stats not in vanilla
 const PD2_STAT_DESCRIPTIONS = {
   'corrupted': { hidden: true }, // Just marks item as corrupted, hide the value
+  'corruptor': { hidden: true }, // Internal corruption metadata
   'item_splashonhit': { formatFn: (vals) => `${vals[2] || 100}% Splash Damage` },
   'item_elemskill_fire': { dF: 1, dV: 1, dP: 'to Fire Skills' },
   'item_elemskill_ltng': { dF: 1, dV: 1, dP: 'to Lightning Skills' },
@@ -1394,6 +1522,9 @@ const PD2_STAT_DESCRIPTIONS = {
   'item_maxdeadlystrike': { dF: 4, dV: 1, dP: 'to Maximum Deadly Strike' },
   'desecrated': { hidden: true },
   'desecrator': { hidden: true },
+  // Season 13 Betrayal — new multipliers (additive with base 1.5x deadly / 2x crit)
+  'item_ds_multiplier':    { dF: 4, dV: 1, dP: 'to Deadly Strike Damage' },
+  'item_crit_multiplier':  { dF: 4, dV: 1, dP: 'to Critical Strike Damage' },
 };
 
 // Display name overrides for PD2 skills with ugly internal names
@@ -1484,8 +1615,12 @@ async function initD2S() {
     difficultyPenalties = parseDifficultyFile(path.join(DATA_DIR, 'DifficultyLevels.txt'));
     experienceTable = parseExperienceFile(path.join(DATA_DIR, 'Experience.txt'));
     hirelingData = parseHirelingFile(path.join(DATA_DIR, 'Hireling.txt'));
-    skillTabMap = parseSkillTabMap(path.join(DATA_DIR, 'Skills.txt'), path.join(DATA_DIR, 'SkillDesc.txt'));
+    skillTabMap = parseSkillTabMap(path.join(DATA_DIR, 'Skills.txt'), path.join(DATA_DIR, 'Skilldesc.txt'));
+    propToStats = parsePropertiesToStats(path.join(DATA_DIR, 'Properties.txt'));
+    uniqueStatRanges = parseItemStatRanges(path.join(DATA_DIR, 'UniqueItems.txt'), 12);
+    setStatRanges = parseItemStatRanges(path.join(DATA_DIR, 'SetItems.txt'), 9);
     console.log(`[OK] Game data: ${Object.keys(classStats).length} classes, ${experienceTable.length - 1} XP levels, ${Object.keys(difficultyPenalties).length} difficulties, ${hirelingData.length} hireling rows, ${Object.keys(skillTabMap).length} skill tabs`);
+    console.log(`[OK] Corruption detection: ${Object.keys(propToStats).length} prop mappings, ${uniqueStatRanges.length} unique ranges, ${setStatRanges.length} set ranges`);
 
     // Load PD2 TXT data files
     if (fs.existsSync(DATA_DIR)) {
@@ -2223,7 +2358,10 @@ function formatStatDescription(attr, constants) {
 }
 
 // Format all magic attributes on an item, grouping combined properties
-function formatItemProperties(item, constants) {
+// baseRanges: optional array of {statName, min, max} for corruption detection
+function formatItemProperties(item, constants, baseRanges) {
+  // Check if item is corrupted (has stat id 409)
+  const isCorrupted = (item.magic_attributes || []).some(a => a.id === 360);
   const attrs = item.magic_attributes || [];
   const runeAttrs = item.runeword_attributes || [];
   const socketAttrs = [];
@@ -2234,6 +2372,10 @@ function formatItemProperties(item, constants) {
       }
     }
   }
+
+  // Build a set of stat IDs that come ONLY from sockets/runewords (not the item itself)
+  const itemStatIds = new Set();
+  for (const a of attrs) { if (a) itemStatIds.add(a.id + ':' + (a.values?.[0] ?? '') + ':' + (a.values?.[1] ?? '')); }
 
   // Combine all attributes
   const allAttrs = [...attrs, ...runeAttrs, ...socketAttrs];
@@ -2265,8 +2407,16 @@ function formatItemProperties(item, constants) {
           if (idx >= 0) existing.values[idx] += attr.values[idx];
         }
       }
+      // Track if socket/rune stats got merged into an item stat
+      if (!itemStatIds.has(attr.id + ':' + (attr.values?.[0] ?? '') + ':' + (attr.values?.[1] ?? ''))) {
+        existing._hasSocketContrib = true;
+      }
     } else {
-      grouped.push({ id: attr.id, values: [...attr.values], name: attr.name });
+      const key = attr.id + ':' + (attr.values?.[0] ?? '') + ':' + (attr.values?.[1] ?? '');
+      grouped.push({
+        id: attr.id, values: [...attr.values], name: attr.name,
+        _fromItem: itemStatIds.has(key),
+      });
     }
   }
 
@@ -2277,11 +2427,19 @@ function formatItemProperties(item, constants) {
     const desc = formatStatDescription(attr, constants);
     if (desc && !seen.has(desc)) {
       seen.add(desc);
-      results.push({
+      const entry = {
         stat: attr.name || `stat_${attr.id}`,
         values: attr.values,
         description: desc,
-      });
+      };
+      // Mark corruption mod if item is corrupted and stat exceeds base ranges
+      // Only check stats from the item itself, not from sockets/runewords
+      if (isCorrupted && baseRanges && baseRanges.length > 0 && attr._fromItem && !attr._hasSocketContrib) {
+        if (isCorruptedStat(attr.name, attr.values, baseRanges)) {
+          entry.corrupted = true;
+        }
+      }
+      results.push(entry);
     }
   }
   return results;
@@ -2336,8 +2494,16 @@ function transformItem(item) {
     displayName = 'Superior ' + baseName;
   }
 
+  // Determine base stat ranges for corruption detection
+  let baseRanges = null;
+  if (item.quality === 7 && item.unique_id !== undefined) {
+    baseRanges = uniqueStatRanges[item.unique_id] || null;
+  } else if (item.quality === 5 && item.set_id !== undefined) {
+    baseRanges = setStatRanges[item.set_id] || null;
+  }
+
   // Format magic properties with D2-style descriptions
-  const props = formatItemProperties(item, d2sConstants);
+  const props = formatItemProperties(item, d2sConstants, baseRanges);
 
   // Set item bonus properties (partial set bonuses)
   const setProps = [];
@@ -2409,6 +2575,11 @@ function transformItem(item) {
     maxDamage,
     twoHandMin,
     twoHandMax,
+    corrupted: (item.magic_attributes || []).some(a => a.id === 360),
+    corruptedSockets: (item.magic_attributes || []).some(a => a.id === 360)
+      && item.nr_of_items_in_sockets > 0
+      && baseRanges != null
+      && !baseRanges.some(r => r.statName === 'item_numsockets'),
     properties: props,
     setProperties: setProps.length > 0 ? setProps : undefined,
     isRuneword: !!item.given_runeword,
@@ -2595,21 +2766,23 @@ const wss = new WebSocketServer({ server });
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/ext', express.static(path.join(__dirname, 'twitch-extension')));
 
 // API: List all characters
 app.get('/api/characters', (req, res) => {
-  const list = [];
-  for (const [name, char] of characters) {
-    list.push({
-      name: char.name,
-      class: char.class,
-      level: char.level,
-      hardcore: char.hardcore,
-      dead: char.dead,
-    });
-  }
-  list.sort((a, b) => a.name.localeCompare(b.name));
+  const list = getSortedCharacters().map(char => ({
+    name: char.name,
+    class: char.class,
+    level: char.level,
+    hardcore: char.hardcore,
+    dead: char.dead,
+  }));
   res.json(list);
+});
+
+// Local preview endpoint — same format as EBS /data but with inventory included
+app.get('/data', (req, res) => {
+  res.json(getSortedCharacters());
 });
 
 // API: Get single character
@@ -2801,15 +2974,16 @@ async function loadCharacter(filePath) {
         if (characters.has(key)) {
           characters.delete(key);
           broadcast('character_removed', { name: char.name });
-          pushToCloud();
+          scheduleCloudPush();
         }
         return;
       }
       const key = char.name.toLowerCase();
+      char._lastModified = Date.now();
       characters.set(key, char);
       console.log(`[OK] Loaded: ${char.name} (Lv${char.level} ${char.class}) [${char._parseMethod}]`);
       broadcast('character_update', char);
-      pushToCloud();
+      scheduleCloudPush();
     }
   } catch (err) {
     console.error(`[ERR] Failed to parse ${filePath}:`, err.message);

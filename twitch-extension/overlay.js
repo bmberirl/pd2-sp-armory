@@ -9,6 +9,7 @@ const POLL_INTERVAL = 120000; // 120 seconds
 let characters = [];
 let currentChar = null;
 let showMerc = false;
+let weaponSet = 1; // 1 = primary, 2 = switch
 let channelId = null;
 let pollTimer = null;
 
@@ -156,10 +157,34 @@ elBtnMerc.addEventListener('click', function() {
   if (currentChar) renderEquipment();
 });
 
+// ── Weapon Swap Tabs ────────────────────────────────────────────────────────
+
+function setWeaponSet(n) {
+  weaponSet = n;
+  var tabs = $$('.swap-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var active = $$('.stab-l' + n + ', .stab-r' + n);
+  for (var j = 0; j < active.length; j++) active[j].classList.add('active');
+  if (currentChar) {
+    renderStats();
+    renderEquipment();
+  }
+}
+
+var swapTabs1 = $$('.stab-l1, .stab-r1');
+for (var _i = 0; _i < swapTabs1.length; _i++) {
+  swapTabs1[_i].addEventListener('click', function() { setWeaponSet(1); });
+}
+var swapTabs2 = $$('.stab-l2, .stab-r2');
+for (var _j = 0; _j < swapTabs2.length; _j++) {
+  swapTabs2[_j].addEventListener('click', function() { setWeaponSet(2); });
+}
+
 // ── Render Character ─────────────────────────────────────────────────────────
 
 function renderCharacter() {
   if (!currentChar) return;
+  setWeaponSet(1); // reset to primary on character change
 
   elCharName.textContent = currentChar.name;
   elCharClass.textContent = currentChar.class;
@@ -167,9 +192,12 @@ function renderCharacter() {
 
   // Flags
   elCharFlags.innerHTML = '';
-  if (currentChar.expansion) addFlag('EXP', 'flag-exp');
-  if (currentChar.hardcore) addFlag('HC', 'flag-hc');
-  if (currentChar.dead) addFlag('DEAD', 'flag-dead');
+  if (currentChar.hardcore) {
+    addFlag('HC', 'flag-hc');
+    if (currentChar.dead) addFlag('DEAD', 'flag-dead');
+  } else {
+    addFlag('SC', 'flag-sc');
+  }
 
   renderStats();
   renderSkills();
@@ -211,7 +239,9 @@ function setResStat(selector, value) {
 // ── Render Stats ─────────────────────────────────────────────────────────────
 
 function renderStats() {
-  var d = currentChar.derivedStats || {};
+  var d = (weaponSet === 2 && currentChar.derivedStatsSwap)
+    ? currentChar.derivedStatsSwap
+    : (currentChar.derivedStats || {});
   var s = currentChar.stats || {};
 
   // Attributes — use derived totals with green when boosted by items
@@ -296,6 +326,10 @@ function renderEquipment() {
   for (var i = 0; i < slots.length; i++) {
     var slotEl = slots[i];
     var slotKey = slotEl.dataset.slot;
+    if (!showMerc && weaponSet === 2) {
+      if (slotKey === 'rArm') slotKey = 'rArmSwitch';
+      else if (slotKey === 'lArm') slotKey = 'lArmSwitch';
+    }
     var label = slotEl.dataset.label;
     var item = items[slotKey];
 
@@ -453,7 +487,8 @@ function showTooltip(item, e) {
       var prop = item.properties[i];
       var desc = prop.description || formatStat(prop.stat, prop.values);
       if (desc) {
-        lines.push('<div class="tt-stat magic">' + esc(desc) + '</div>');
+        var cls = prop.corrupted ? 'corrupted-mod' : 'magic';
+        lines.push('<div class="tt-stat ' + cls + '">' + esc(desc) + '</div>');
       }
     }
   }
@@ -473,12 +508,17 @@ function showTooltip(item, e) {
   // Sockets
   if (item.numSockets > 0) {
     lines.push('<div class="tt-separator"></div>');
-    lines.push('<div class="tt-stat socketed">Socketed (' + item.numSockets + ')</div>');
+    var sockCls = item.corruptedSockets ? 'corrupted-mod' : 'socketed';
+    lines.push('<div class="tt-stat ' + sockCls + '">Socketed (' + item.numSockets + ')</div>');
     if (item.sockets) {
       for (var k = 0; k < item.sockets.length; k++) {
         lines.push('<div class="tt-socket">' + esc(item.sockets[k].name) + '</div>');
       }
     }
+  }
+
+  if (item.corrupted) {
+    lines.push('<div class="tt-corrupted-label">Corrupted</div>');
   }
 
   elTooltip.innerHTML = lines.join('');

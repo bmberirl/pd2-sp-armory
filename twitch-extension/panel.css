@@ -107,9 +107,9 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+.flag-sc { background: #1a3a1a; color: #88cc88; }
 .flag-hc { background: #8b2020; color: #ff8888; }
 .flag-dead { background: #4a0a0a; color: #ff4444; }
-.flag-exp { background: #1a3a1a; color: #88cc88; }
 
 /* ── View Toggle ─────────────────────────────────────────────────────────── */
 #view-toggle {
@@ -408,6 +408,9 @@ body {
 .tt-stat.req { color: var(--text-dim); }
 .tt-stat.ethereal { color: #8888cc; font-style: italic; }
 .tt-stat.socketed { color: #aaaaaa; }
+.tt-stat.corrupted-mod { color: #6888ff; }
+.tt-stat.corrupted-mod::before { content: '★ '; color: #ff4444; }
+.tt-corrupted-label { color: #ff4444; font-weight: bold; margin-top: 2px; }
 
 .tt-white { color: #ffffff; }
 

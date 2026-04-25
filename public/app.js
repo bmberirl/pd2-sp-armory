@@ -137,9 +137,12 @@ function renderCharacter() {
 
   // Flags
   elCharFlags.innerHTML = '';
-  if (currentChar.expansion) addFlag('EXP', 'flag-exp');
-  if (currentChar.hardcore) addFlag('HC', 'flag-hc');
-  if (currentChar.dead) addFlag('DEAD', 'flag-dead');
+  if (currentChar.hardcore) {
+    addFlag('HC', 'flag-hc');
+    if (currentChar.dead) addFlag('DEAD', 'flag-dead');
+  } else {
+    addFlag('SC', 'flag-sc');
+  }
 
   // Parse notice
   if (currentChar._notice) {
@@ -440,7 +443,8 @@ function showTooltip(item, e) {
     for (const prop of item.properties) {
       const desc = prop.description || formatStat(prop.stat, prop.values);
       if (desc) {
-        lines.push(`<div class="tt-stat magic">${esc(desc)}</div>`);
+        const cls = prop.corrupted ? 'corrupted-mod' : 'magic';
+        lines.push(`<div class="tt-stat ${cls}">${esc(desc)}</div>`);
       }
     }
   }
@@ -459,12 +463,18 @@ function showTooltip(item, e) {
   // Sockets
   if (item.numSockets > 0) {
     lines.push('<div class="tt-separator"></div>');
-    lines.push(`<div class="tt-stat socketed">Socketed (${item.numSockets})</div>`);
+    const sockCls = item.corruptedSockets ? 'corrupted-mod' : 'socketed';
+    lines.push(`<div class="tt-stat ${sockCls}">Socketed (${item.numSockets})</div>`);
     if (item.sockets) {
       for (const s of item.sockets) {
         lines.push(`<div class="tt-socket">${esc(s.name)}</div>`);
       }
     }
+  }
+
+  // Corrupted label
+  if (item.corrupted) {
+    lines.push('<div class="tt-corrupted-label">Corrupted</div>');
   }
 
   elTooltip.innerHTML = lines.join('');
@@ -541,11 +551,9 @@ function handleWSMessage(msg) {
     const idx = characters.findIndex(c => c.name === char.name);
     const summary = { name: char.name, class: char.class, level: char.level, hardcore: char.hardcore, dead: char.dead };
     if (idx >= 0) {
-      characters[idx] = summary;
-    } else {
-      characters.push(summary);
-      characters.sort((a, b) => a.name.localeCompare(b.name));
+      characters.splice(idx, 1);
     }
+    characters.unshift(summary); // most recently modified first
     populateDropdown();
 
     // If this is the currently viewed character, update it

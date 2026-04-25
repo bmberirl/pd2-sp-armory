@@ -168,9 +168,12 @@ function renderCharacter() {
 
   // Flags
   elCharFlags.innerHTML = '';
-  if (currentChar.expansion) addFlag('EXP', 'flag-exp');
-  if (currentChar.hardcore) addFlag('HC', 'flag-hc');
-  if (currentChar.dead) addFlag('DEAD', 'flag-dead');
+  if (currentChar.hardcore) {
+    addFlag('HC', 'flag-hc');
+    if (currentChar.dead) addFlag('DEAD', 'flag-dead');
+  } else {
+    addFlag('SC', 'flag-sc');
+  }
 
   renderStats();
   renderSkills();
@@ -350,7 +353,8 @@ function showTooltip(item, e) {
       var prop = item.properties[i];
       var desc = prop.description || formatStat(prop.stat, prop.values);
       if (desc) {
-        lines.push('<div class="tt-stat magic">' + esc(desc) + '</div>');
+        var cls = prop.corrupted ? 'corrupted-mod' : 'magic';
+        lines.push('<div class="tt-stat ' + cls + '">' + esc(desc) + '</div>');
       }
     }
   }
@@ -370,12 +374,17 @@ function showTooltip(item, e) {
   // Sockets
   if (item.numSockets > 0) {
     lines.push('<div class="tt-separator"></div>');
-    lines.push('<div class="tt-stat socketed">Socketed (' + item.numSockets + ')</div>');
+    var sockCls = item.corruptedSockets ? 'corrupted-mod' : 'socketed';
+    lines.push('<div class="tt-stat ' + sockCls + '">Socketed (' + item.numSockets + ')</div>');
     if (item.sockets) {
       for (var k = 0; k < item.sockets.length; k++) {
         lines.push('<div class="tt-socket">' + esc(item.sockets[k].name) + '</div>');
       }
     }
+  }
+
+  if (item.corrupted) {
+    lines.push('<div class="tt-corrupted-label">Corrupted</div>');
   }
 
   elTooltip.innerHTML = lines.join('');

@@ -53,9 +53,9 @@ Runes 14 equiv			1						r27s	3	r28s	2	Runes 13 equiv	2170																		0
 Runes 15 equiv			1						r29s	3	r30s	2	Runes 14 equiv	2941																		0
 Runes 16 equiv			1						r31s	3	r32s	2	Runes 15 equiv	3957																		0
 Runes 17 equiv			1						r33s	1	Runes 16 equiv	5170																				0
-Map Tier 1			1			400	800		t23	1	t15	1	t12	1	t26	1	t25	1	t22	1	t36	1	t17	1								0
-Map Tier 2			1			400	800		t34	1	t31	1	t24	1	t11	1	t33	1	t13	1	t27	1	t28	1								0
-Map Tier 3			1			400	800		t3a	2	t38	2	t39	2	t37	2	t14	2	t21	2	t32	2	t16	2	t35	2						0
+Map Tier 1			1			400	800		t34	1	t22	1	t24	1	t36	1	t21	1	t26	1	t11	1	t33	1								0
+Map Tier 2			1			400	800		t16	1	t12	1	t3a	1	t37	1	t25	1	t14	1	t34	1	t32	1	t17	1						0
+Map Tier 3			1			400	800		t35	1	t3b	1	t15	1	t23	1	t13	1	t28	1	t27	1	t31	1	t39	1						0
 T1 Map Drop			1						Map Tier 1	66	Map Tier 2	33																				0
 T2 Map Drop			1						Map Tier 1	39	Map Tier 2	40	Map Tier 3	20																		0
 T3 Map Drop			1						Map Tier 1	32	Map Tier 2	33	Map Tier 3	33																		0
@@ -1003,42 +1003,86 @@ Larzuk Puzzlebox H				1688	100																											0
 Larzuk Puzzlepiece N				4050	100																											0
 Larzuk Puzzlepiece NM				2025	100																											0
 Larzuk Puzzlepiece H				675	100																											0
-SkeletonKey N				15000	1000																											
-SkeletonKey NM				7500	1000																											
-SkeletonKey H				5000	1000																											
-Horadric ID Book N				15000	1000																											
-Horadric ID Book NM				7500	1000																											
-Horadric ID Book H				5000	1000																											
-Horadric TP Book N				15000	1000																											
-Horadric TP Book NM				7500	1000																											
-Horadric TP Book H				5000	1000																											
-Lillith Mirror N				75000	1000																											
-Lillith Mirror NM				37500	1000																											
-Lillith Mirror H				25000	1000																											
-Vial of Lightsong N				22500	1000																											
-Vial of Lightsong NM				11250	1000																											
-Vial of Lightsong H				7500	1000																											
-Corrupted Zone				150																												
-Unique Map Monsters				7500	10																											
-Unique Map MapBoss				6000																												
-Rathma Jawbone N				0	100																											
-Rathma Jawbone NM				0	10																											
-Rathma Jawbone H				2250	10																											
-UberAncients T1				5440																												
-UberAncients T2				5440																												
-UberAncients T3				5440																												
-lucbN				0	10																											
-lucbNM				0																												
-lucbH				2000																												
-lucc				4000																												
-lucdN				0	100																											
-lucdNM				0	10																											
-lucdH				2600	10																											
+SkeletonKey N				15000	1000																											0
+SkeletonKey NM				7500	1000																											0
+SkeletonKey H				5000	1000																											0
+Horadric ID Book N				15000	1000																											0
+Horadric ID Book NM				7500	1000																											0
+Horadric ID Book H				5000	1000																											0
+Horadric TP Book N				15000	1000																											0
+Horadric TP Book NM				7500	1000																											0
+Horadric TP Book H				5000	1000																											0
+Lillith Mirror N				75000	1000																											0
+Lillith Mirror NM				37500	1000																											0
+Lillith Mirror H				25000	1000																											0
+Vial of Lightsong N				22500	1000																											0
+Vial of Lightsong NM				11250	1000																											0
+Vial of Lightsong H				7500	1000																											0
+Corrupted Zone				300																												0
+Unique Map Monsters				5625	10																											0
+Unique Map MapBoss				3000																												0
+Rathma Jawbone N				0	100																											0
+Rathma Jawbone NM				0	10																											0
+Rathma Jawbone H				2250	10																											0
+UberAncients T1				5440																												0
+UberAncients T2				5440																												0
+UberAncients T3				5440																												0
+lucbN				0	10																											0
+lucbNM				0																												0
+lucbH				2000																												0
+lucc				4000																												0
+lucdN				0	100																											0
+lucdNM				0	10																											0
+lucdH				2600	10																											0
 T4MidMapBoss		90	6	950	960	990	1024	0	Act 5 (H) Equip C	800	Jewelry C	100	Runes 17 equiv	30	wss	25	T3 Map Drop	10	T2 Map Drop	10	T1 Map Drop	10	scrb	3								0
 T4FinalMapBoss		90	6	950	960	990	1024	0	Act 5 (H) Equip C	800	Jewelry C	100	Runes 17 equiv	30	wss	25	T3 Map Drop	10	T2 Map Drop	10	T1 Map Drop	10	scrb	3								0
 LucionChestLow		90	6	800	900	990	1024	0	Act 5 (H) Equip C	200	Act 5 (H) Good	100	Runes 15 equiv	30	wss	25																0
 LucionChestHigh		90	6	950	960	990	1024	0	Act 5 (H) Equip C	800	Jewelry C	100	Runes 17 equiv	30	scrb	3																0
-Demonic Cube N				20000	1000																											
-Demonic Cube NM				10000	1000																											
-Demonic Cube H				2000	1000																											
-Corrupted Zone T1 Maps				300																												
+Demonic Cube N				20000	1000																											0
+Demonic Cube NM				10000	1000																											0
+Demonic Cube H				1000	1000																											0
+Corrupted Zone T1 Maps				600																												0
+InvaderLightArmor			1	850	850	1307	200		uul	1	uea	1	ula	1	utu	1	urs	1	utp	1												0
+InvaderMediumArmor			1	850	850	1307	200		ung	1	ucl	1	uhn	1	upl	1																0
+InvaderHeavyArmor			1	850	850	1307	200		ult	2	uul	2	uar	1	uth	2	uld	2														0
+InvaderBodyAll			1	850	850	1307	200		InvaderLightArmor	1	InvaderMediumArmor	1	InvaderHeavyArmor	1																		0
+InvaderBodyLightMed			1	850	850	1307	200		InvaderLightArmor	1	InvaderMediumArmor	1																				0
+InvaderBodyMedHeavy			1	850	850	1307	200		InvaderMediumArmor	1	InvaderHeavyArmor	1																				0
+InvaderGloves			1	850	850	1307	200		ulg	1	uvg	1	umg	1	utg	1	uhg	1														0
+InvaderBoots			1	850	850	1307	200		ulb	1	uvb	1	umb	1	utb	1	uhb	1														0
+InvaderBelt			1	850	850	1307	200		ulc	1	uvc	1	umc	1	utc	1	uhc	1														0
+InvaderRing			1	850	850	1307	200		rin	1																						0
+InvaderAmulet			1	850	850	1307	200		amu	1																						0
+InvaderGenericHelm			1	850	850	1307	200		uap	1	ukp	1	ulm	1	uhl	1	usk	1	uh9	1	uhm	1	urn	1	ci3	1						0
+InvaderGenericShield			1	850	850	1307	200		uuc	1	uml	1	urg	1	upk	1	uit	1	ush	1	uow	1	uts	1								0
+InvaderAmazonBow			1	850	850	1307	200		6sb	1	6hb	1	6lb	1	6cb	1	6s7	1	6l7	1	6sw	1	6lw	1	amb	1	amc	1				0
+InvaderAmazonQuiver			1	850	850	1307	200		aqv	1	aqv2	2	aqv3	4																		0
+InvaderAmazonCrossbow			1	850	850	1307	200		6lx	1	6mx	1	6hx	1	6rx	1																0
+InvaderAmazonBolt			1	850	850	1307	200		cqv	1	cqv	2	cqv3	4																		0
+InvaderAmazon2hSpear			1	850	850	1307	200		7sr	1	7tr	1	7br	1	7st	1	7p7	1	amd	1	ame	1										0
+InvaderAmazon1hJavelin			1	850	850	1307	200		ama	1	amf	3																				0
+InvaderCirclets			1	850	850	1307	200		ci1	1	ci2	1	ci3	1																		0
+InvaderAssassinClaw			1	850	850	1307	200		7ar	1	7wb	1	7xf	1	7cs	1	7lw	1	7tw	1	7qr	1										0
+InvaderAssassinDagger			1	850	850	1307	200		7dg	1	7di	1	7kr	1	7bl	1																0
+InvaderAssassinWeapon			1	850	850	1307	200		InvaderAssassinClaw	2	InvaderAssassinDagger	1																				0
+InvaderBarbarianHelm			1	850	850	1307	200		bab	1	bac	1	bad	1	bae	1	baf	1														0
+InvaderBarbarianThrow			1	850	850	1307	200		7tk	1	7ta	1	7bk	1	7b8	1	7ja	1	7pi	1	7s7	1	7gl	1	7ts	1						0
+Invader1hAxe			1	850	850	1307	200		7ha	1	7ax	1	72a	1	7mp	1	7wa	1														0
+Invader1hMace			1	850	850	1307	200		7ma	1	7mt	1	7fl	1	7wh	1																0
+Invader1hSword			1	850	850	1307	200		7ss	1	7sm	1	7sb	1	7fc	1	7cr	1	7bs	1	7ls	1	7wd									0
+InvaderBarbarian1h			1	850	850	1307	200		Invader1hAxe	1	Invader1hMace	1	Invader1hSword	1	Invader2hSword	1																0
+Invader2hAxe			1	850	850	1307	200		7la	1	7ba	1	7bt	1	7ga	1	7gi	1														0
+Invader2hMace			1	850	850	1307	200		7m7	1	7gm	1																				0
+Invader2hSword			1	850	850	1307	200		7cm	1	7gs	1	7b7	1	7fb	1	7gd	1														0
+Invader2hSpear			1	850	850	1307	200		7sr	1	7tr	1	7br	1	7st	1	7p7	1														0
+Invader2hPolearm			1	850	850	1307	200		7o7	1	7vo	1	7s8	1	7pa	1	7h7	1	7wc	1												0
+InvaderBarbarian2h			1	850	850	1307	200		Invader2hAxe	1	Invader2hMace	1	Invader2hSword	1	Invader2hSpear	1	Invader2hPolearm	1														0
+InvaderDruidHelm			1	850	850	1307	200		drb	1	drc	1	drd	1	dre	1	drf	1														0
+InvaderDruidWeapon			1	850	850	1307	200		7cl	1	7sp	1																				0
+InvaderNecroWeapon			1	850	850	1307	200		7wn	1	7yw	1	7bw	1	7gw	1																0
+InvaderNecroShield			1	850	850	1307	200		neb	1	neg	1	ned	1	nee	1	nef	1														0
+InvaderSorc2hWeapon			1	850	850	1307	200		6ss	1	6ls	1	6cs	1	6bs	1	6ws	1														0
+InvaderSorc1hWeapon			1	850	850	1307	200		obb	1	obc	1	obd	1	obe	1	obf	1														0
+Invader1hScepter			1	850	850	1307	200		7sc	1	7qs	1	7ws	1																		0
+InvaderPaladinWeapon			1	850	850	1307	200		Invader1hSword	2	Invader1hMace	2	Invader1hAxe	1	Invader1hScepter	4																0
+InvaderPaladinShield			1	850	850	1307	200		pab	1	pac	1	pad	1	pae	1	paf	1														0
