@@ -1,7 +1,7 @@
 <img width="1331" height="750" alt="image" src="https://github.com/user-attachments/assets/1189e8a9-5532-4641-9e35-efacca1ed038" />
 
 
-
+https://dashboard.twitch.tv/extensions/wlmury4i9mbawryxu06u6vtk8p1xnl-1.0.2
 
 # PD2 SP Armory
 
